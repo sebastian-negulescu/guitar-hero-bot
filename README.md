@@ -1,1 +1,2 @@
-# guitar-hero-bot
+# Guitar Hero Bot
+
