@@ -2,26 +2,36 @@ import math
 import cv2 as cv
 import numpy as np
 
-def find_guitar( image ):
-    edges = cv.Canny( image, 50, 200, None, 3 )
+def find_guitar(image):
+    edges = cv.Canny(image, 50, 200, None, 3)
 
     # Copy edges to the images that will display the results in BGR
-    drawn_outline = cv.cvtColor( edges, cv.COLOR_GRAY2BGR )
+    drawn_outline = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
 
-    lines = cv.HoughLines( edges, 1, np.pi / 180, 400, None, 0, 0 )
+    lines = cv.HoughLines(edges, 1, np.pi / 180, 400, None, 0, 0)
 
+    filtered_lines = []
     # draw the lines
     if lines is not None:
-        for i in range(0, len(lines)):
-            rho = lines[i][0][0]
-            theta = lines[i][0][1]
-            a = math.cos(theta)
-            b = math.sin(theta)
-            x0 = a * rho
-            y0 = b * rho
-            pt1 = (int(x0 + 5000*(-b)), int(y0 + 5000*(a)))
-            pt2 = (int(x0 - 5000*(-b)), int(y0 - 5000*(a)))
-            cv.line(drawn_outline, pt1, pt2, (0,0,255), 3, cv.LINE_AA)
+        for line in lines:
+            theta = line[0][1]
+            if not math.isclose(theta, math.pi / 2, rel_tol=1e-5):
+                filtered_lines.append(line)
+
+    guitar = []
+    if len(filtered_lines) > 1:
+        # two sum to pi / 2
+        target = float(math.pi / 2)
+        angles = {}
+        for index, line in enumerate(filtered_lines):
+            theta = line[0][1]
+            if theta in angles.keys():
+                guitar.append(filtered_lines[index])
+                guitar.append(filtered_lines[angles[theta]])
+            else:
+                angles[target - theta] = index
+
+    print(filtered_lines)
 
     return drawn_outline 
 
