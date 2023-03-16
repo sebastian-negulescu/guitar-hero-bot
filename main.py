@@ -18,26 +18,24 @@ def find_guitar(image):
             if not math.isclose(theta, math.pi / 2, rel_tol=1e-5):
                 filtered_lines.append(line)
 
-    guitar = []
-    if len(filtered_lines) > 1:
-        # two sum to pi / 2
-        target = float(math.pi / 2)
-        angles = {}
-        for index, line in enumerate(filtered_lines):
-            theta = line[0][1]
-            if theta in angles.keys():
-                guitar.append(filtered_lines[index])
-                guitar.append(filtered_lines[angles[theta]])
-            else:
-                angles[target - theta] = index
+    guitar = None
+    if len(filtered_lines) > 0: 
+        for line_1 in filtered_lines:
+            theta_1 = line_1[0][1]
+            for line_2 in filtered_lines:
+                theta_2 = line_2[0][1]
+                if math.isclose(math.pi - theta_1, theta_2, rel_tol=1e-3):
+                    guitar = (line_1, line_2)
+                    break
 
     print(filtered_lines)
+    print(guitar)
 
-    return drawn_outline 
+    return drawn_outline, guitar
 
 def main():
     screen = cv.imread('./test.png')
-    cdst = find_guitar(screen) 
+    cdst, _ = find_guitar(screen) 
 
     cv.imshow('wimdow', cdst)
     cv.waitKey(0)
