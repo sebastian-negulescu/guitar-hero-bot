@@ -1,6 +1,10 @@
+import os
 import math
 import cv2 as cv
 import numpy as np
+
+PATH = os.path.dirname(os.path.realpath(__file__))
+DEFAULT_NOTES_PATH = os.path.join(PATH, './notes')
 
 EPSILON = 1e-5
 MIDDLE_TOLERANCE = 5
@@ -65,14 +69,28 @@ def find_guitar(image):
                         return (line_1, line_2)
 
 
+def find_notes(image, notes_path=DEFAULT_NOTES_PATH):
+    # red note
+    red_note_name = 'red_note.png'
+    red_note_path = os.path.join(notes_path, red_note_name)
+    red_note_image = cv.imread(red_note_path)
+    h, w = red_note_image.shape[0:2]
+
+    result = cv.matchTemplate(image, red_note_image, cv.TM_CCOEFF)
+    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(result)
+    top_left = max_loc
+    bottom_right = (top_left[0] + w, top_left[1] + h)
+
+    cv.rectangle(image, top_left, bottom_right, [255, 255, 255], 2)
+    cv.imshow('wimdow', image)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
+
 def main():
     screen = cv.imread('./test.png')
     guitar_lines = find_guitar(screen) 
-    print(guitar_lines)
-
-    cv.imshow('wimdow', screen)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    find_notes(screen)
 
 if __name__ == "__main__":
     main()
