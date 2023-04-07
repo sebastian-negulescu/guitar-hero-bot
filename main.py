@@ -1,5 +1,6 @@
 import os
 import math
+import pdb
 import cv2 as cv
 import numpy as np
 
@@ -67,8 +68,8 @@ def find_guitar(image):
 
                     if math.isclose(poi[0], cols, rel_tol=MIDDLE_TOLERANCE):
                         # intersect guitar lines with base of image
-                        poi_1 = point_of_intersection(line_1, [[0, np.pi / 2]])
-                        poi_2 = point_of_intersection(line_2, [[0, np.pi / 2]])
+                        poi_1 = point_of_intersection(line_1, [[len(image), np.pi / 2]])
+                        poi_2 = point_of_intersection(line_2, [[len(image), np.pi / 2]])
                         if poi_1 is None or poi_2 is None:
                             return None
                         return [poi, poi_1, poi_2]
@@ -79,8 +80,7 @@ def crop_image(image, bounds):
     mask = np.zeros_like(image)
 
     # Create a white triangle on the mask
-    triangle = np.array(bounds, dtype=np.float32)
-    print(triangle)
+    triangle = np.array(bounds, dtype=np.int32)
     cv.fillPoly(mask, [triangle], (255,255,255))
 
     # Apply the mask to the image
