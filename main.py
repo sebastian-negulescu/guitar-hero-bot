@@ -71,7 +71,7 @@ def find_guitar(image):
 
 def find_notes(image, notes_path=DEFAULT_NOTES_PATH):
     # red note
-    red_note_name = 'red_note.png'
+    red_note_name = 'red-note.png'
     red_note_path = os.path.join(notes_path, red_note_name)
     red_note_image = cv.imread(red_note_path)
     h, w = red_note_image.shape[0:2]
