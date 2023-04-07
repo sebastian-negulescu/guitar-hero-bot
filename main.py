@@ -70,18 +70,36 @@ def find_guitar(image):
 
 
 def find_notes(image, notes_path=DEFAULT_NOTES_PATH):
+    # left to right
+    # green, red, yellow, blue, orange
     # red note
+    note_colours = ['green', 'red', 'yellow', 'blue', 'orange']
+    for note_colour in note_colours:
+        note_filename = f'{note_colour}-note.png'
+        note_path = os.path.join(notes_path, note_filename)
+        note_template = cv.imread(note_path)
+        h, w = note_template.shape[0:2]
+
+        match_result = cv.matchTemplate(image, note_template, cv.TM_CCOEFF)
+        min_val, max_val, min_loc, max_loc = cv.minMaxLoc(match_result)
+        top_left = max_loc
+        bottom_right = (top_left[0] + w, top_left[1] + h)
+
+        cv.rectangle(image, top_left, bottom_right, [255, 255, 255], 2)
+
+    '''
     red_note_name = 'red-note.png'
     red_note_path = os.path.join(notes_path, red_note_name)
     red_note_image = cv.imread(red_note_path)
     h, w = red_note_image.shape[0:2]
 
-    result = cv.matchTemplate(image, red_note_image, cv.TM_CCOEFF)
-    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(result)
+    red_result = cv.matchTemplate(image, red_note_image, cv.TM_CCOEFF)
+    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(red_result)
     top_left = max_loc
     bottom_right = (top_left[0] + w, top_left[1] + h)
 
     cv.rectangle(image, top_left, bottom_right, [255, 255, 255], 2)
+    '''
     cv.imshow('wimdow', image)
     cv.waitKey(0)
     cv.destroyAllWindows()
