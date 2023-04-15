@@ -1,7 +1,10 @@
 import os
 import math
+import time
 import cv2 as cv
 import numpy as np
+
+from note import Note
 
 PATH = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_NOTES_PATH = os.path.join(PATH, './notes')
@@ -66,35 +69,34 @@ def find_guitar(image):
                     cols = image.shape[1]
 
                     if math.isclose(poi[0], cols, rel_tol=MIDDLE_TOLERANCE):
-                        # intersect guitar lines with base of image
+                        # intersect guitar lines with base of image to form a triangle
                         poi_1 = point_of_intersection(line_1, [[len(image), np.pi / 2]])
                         poi_2 = point_of_intersection(line_2, [[len(image), np.pi / 2]])
                         if poi_1 is None or poi_2 is None:
                             return None
+                        # return the 3 points forming the triangle
                         return [poi, poi_1, poi_2]
 
-                    
+ 
 def crop_image(image, bounds):
-    # Create a mask with the same size as the image
+    # create a mask with the same size as the image
     mask = np.zeros_like(image)
 
-    # Create a white triangle on the mask
+    # create a white triangle on the mask
     triangle = np.array(bounds, dtype=np.int32)
     cv.fillPoly(mask, [triangle], (255,255,255))
 
-    # Apply the mask to the image
+    # apply the mask to the image
     result = cv.bitwise_and(image, mask)
 
-    # Display the cropped image
-    cv.imshow('Cropped Image', result)
+    # display the cropped image
+    cv.imshow('guitar', result)
     cv.waitKey(0)
     cv.destroyAllWindows()
 
 
-def find_notes(image, notes_path=DEFAULT_NOTES_PATH):
-    # left to right
-    # green, red, yellow, blue, orange
-    # red note
+def load_notes(notes_path=DEFAULT_NOTES_PATH):
+    notes = {}
     note_colours = [
         ('green', (0, 255, 0)), 
         ('red', (0, 0, 255)), 
@@ -106,25 +108,58 @@ def find_notes(image, notes_path=DEFAULT_NOTES_PATH):
         note_filename = f'{note_colour_name}-note.png'
         note_path = os.path.join(notes_path, note_filename)
         note_template = cv.imread(note_path)
+        notes[note_colour_name] = Note(note_template, note_colour, (1440, 2560))
+
+    return notes
+
+
+def find_note_bases(image, notes):
+    image_height, image_width, _ = image.shape
+    for note in notes.values():
+        # compute the scale relative to the note
+        scale_width = image_width / note.shape[1]
+        scale_height = image_height / note.shape[0]
+
+        # resize the note
+        note_template = cv.resize(note.template, (0, 0), fx=scale_width, fy=scale_height)
         h, w = note_template.shape[0:2]
 
-        match_result = cv.matchTemplate(image, note_template, cv.TM_CCOEFF)
-        min_val, max_val, min_loc, max_loc = cv.minMaxLoc(match_result)
+        # execute the match algorithm
+        match_results = cv.matchTemplate(image, note_template, cv.TM_CCOEFF_NORMED)
+
+        # get the best result
+        min_val, max_val, min_loc, max_loc = cv.minMaxLoc(match_results)
         top_left = max_loc
         bottom_right = (top_left[0] + w, top_left[1] + h)
+        note.bounds = (top_left, bottom_right)
 
-        cv.rectangle(image, top_left, bottom_right, note_colour, 2)
+        cv.rectangle(image, top_left, bottom_right, note.colour, 2)
 
-    cv.imshow('wimdow', image)
+    return notes
+
+
+def find_notes(image, notes):
+    lower_brightness = np.array([0, 0, 200])
+    upper_brightness = np.array([255, 255, 255])
+
+    hsv_img = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+
+    brightness_mask = cv.inRange(image, lower_brightness, upper_brightness)
+
+    brightness_img = cv.bitwise_and(image, image, mask=brightness_mask)
+
+    cv.imshow('original', image)
+    cv.imshow('brighness', brightness_img)
     cv.waitKey(0)
     cv.destroyAllWindows()
 
-
 def main():
-    screen = cv.imread('./test.png')
+    screen = cv.imread('./test-multiple-notes.png')
     guitar_points = find_guitar(screen) 
-    crop_image(screen, guitar_points)
-    #find_notes(screen)
+    # crop_image(screen, guitar_points)
+    notes = load_notes()
+    # find_note_bases(screen, notes)
+    find_notes(screen, None)
 
 if __name__ == "__main__":
     main()
