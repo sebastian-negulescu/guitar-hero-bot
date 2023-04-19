@@ -4,7 +4,7 @@ import time
 import cv2 as cv
 import numpy as np
 
-from note import Note
+from note import Note, NoteType
 
 PATH = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_NOTES_PATH = os.path.join(PATH, './notes')
@@ -95,7 +95,7 @@ def crop_image(image, bounds):
     cv.destroyAllWindows()
 
 
-def load_notes(notes_path=DEFAULT_NOTES_PATH):
+def load_notes(type, notes_path=DEFAULT_NOTES_PATH):
     notes = {}
     note_colours = [
         ('green', (0, 255, 0)), 
@@ -105,7 +105,11 @@ def load_notes(notes_path=DEFAULT_NOTES_PATH):
         ('orange', (0, 165, 255))
     ]
     for note_colour_name, note_colour in note_colours:
-        note_filename = f'{note_colour_name}-note.png'
+        note_filename = None
+        if type == NoteType.regular:
+            note_filename = f'{note_colour_name}-note.png'
+        if type == NoteType.base:
+            note_filename = f'{note_colour_name}-note-base.png'
         note_path = os.path.join(notes_path, note_filename)
         note_template = cv.imread(note_path)
         notes[note_colour_name] = Note(note_template, note_colour, (1440, 2560))
@@ -139,27 +143,48 @@ def find_note_bases(image, notes):
 
 
 def find_notes(image, notes):
-    lower_brightness = np.array([0, 0, 200])
-    upper_brightness = np.array([255, 255, 255])
+    '''
+    image_height, image_width, _ = image.shape
+    for note in notes.values():
+        note_sift = cv.xfeatures2d.SIFT_create()
 
-    hsv_img = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+        kp1, des1 = note_sift.detectAndCompute(note.template, None)
+        kp2, des2 = note_sift.detectAndCompute(image, None)
 
-    brightness_mask = cv.inRange(image, lower_brightness, upper_brightness)
+        matcher = cv.FlannBasedMatcher()
+        matches = matcher.match(des1, des2)
+        matches = sorted(matches, key=lambda x: x.distance)
 
-    brightness_img = cv.bitwise_and(image, image, mask=brightness_mask)
+        result = cv.drawMatches(note.template, kp1, image, kp2, matches[:10], None)
+        cv.imshow('result', result)
+        cv.waitKey(0)
+    '''
+    gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    
+    # Threshold image based on brightness value (here, 150)
+    ret, thresh = cv.threshold(gray, 200, 255, cv.THRESH_BINARY)
 
-    cv.imshow('original', image)
-    cv.imshow('brighness', brightness_img)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    # Create mask from threshold image
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[thresh == 255] = 255
 
+    # Apply mask to original image
+    masked_img = cv.bitwise_and(image, image, mask=mask)
+    cv.imshow('masked', masked_img)
+    
 def main():
     screen = cv.imread('./test-multiple-notes.png')
     guitar_points = find_guitar(screen) 
     # crop_image(screen, guitar_points)
-    notes = load_notes()
-    # find_note_bases(screen, notes)
-    find_notes(screen, None)
+    note_bases = load_notes(NoteType.base)
+    notes = load_notes(NoteType.regular)
+    # find_note_bases(screen, note_bases)
+    find_notes(screen, notes)
+
+    #cv.imshow('blep', screen)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
