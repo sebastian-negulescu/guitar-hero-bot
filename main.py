@@ -159,17 +159,17 @@ def find_notes(image, notes):
         cv.imshow('result', result)
         cv.waitKey(0)
     '''
-    gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV)
     
-    # Threshold image based on brightness value (here, 150)
-    ret, thresh = cv.threshold(gray, 200, 255, cv.THRESH_BINARY)
+    lower_white = np.array([0, 0, 200], dtype=np.uint8)
+    upper_white = np.array([255, 50, 255], dtype=np.uint8)
 
-    # Create mask from threshold image
     mask = np.zeros(image.shape[:2], np.uint8)
-    mask[thresh == 255] = 255
 
-    # Apply mask to original image
+    mask = cv.inRange(hsv, lower_white, upper_white)
+
     masked_img = cv.bitwise_and(image, image, mask=mask)
+
     cv.imshow('masked', masked_img)
     
 def main():
