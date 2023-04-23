@@ -10,3 +10,5 @@ rather than identify the bright spots, identify the colours used HSV
 we can get the connected component by masking out based on the note's HSV colour
 this is typically a range, so look at dark and brinht spots in paint to find something appropriate
 then, we can filter out all the small squares
+
+for red detection, we need to wrap the hue around 0, eg detect between 0-5, 355-360
