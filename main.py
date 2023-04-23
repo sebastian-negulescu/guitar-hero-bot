@@ -144,9 +144,18 @@ def find_note_bases(image, notes):
 
 def find_notes(image, notes):
     hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+
+    yellow_low = (25, 100, 100)
+    yellow_high = (35, 255, 255)
+
+    red_low = (170, 50, 50)
+    red_high = (179, 255, 255)
+
+    green_low = (55, 50, 100)
+    green_high = (65, 255, 255)
     
-    lower_white = np.array([25, 100, 100], dtype=np.uint8)
-    upper_white = np.array([35, 255, 255], dtype=np.uint8)
+    lower_white = np.array(green_low, dtype=np.uint8)
+    upper_white = np.array(green_high, dtype=np.uint8)
 
     mask = cv.inRange(hsv, lower_white, upper_white)
     masked_img = cv.bitwise_and(image, image, mask=mask)
@@ -176,7 +185,7 @@ def find_notes(image, notes):
 
     
 def main():
-    screen = cv.imread('./test-bar-notes.png')
+    screen = cv.imread('./test-multiple-notes.png')
     guitar_points = find_guitar(screen) 
     # crop_image(screen, guitar_points)
     note_bases = load_notes(NoteType.base)
