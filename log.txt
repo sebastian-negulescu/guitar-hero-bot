@@ -1,0 +1,12 @@
+What to do for identifying the notes?
+
+current idea:
+threshold the brightness, and run a connected component analysis
+problem:
+we get two connected components per note
+could filter out by size, though that doesn't make it resolution agnostic
+solution:
+rather than identify the bright spots, identify the colours used HSV
+we can get the connected component by masking out based on the note's HSV colour
+this is typically a range, so look at dark and brinht spots in paint to find something appropriate
+then, we can filter out all the small squares
