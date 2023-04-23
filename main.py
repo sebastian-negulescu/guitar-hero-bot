@@ -143,43 +143,50 @@ def find_note_bases(image, notes):
 
 
 def find_notes(image, notes):
-    '''
-    image_height, image_width, _ = image.shape
-    for note in notes.values():
-        note_sift = cv.xfeatures2d.SIFT_create()
-
-        kp1, des1 = note_sift.detectAndCompute(note.template, None)
-        kp2, des2 = note_sift.detectAndCompute(image, None)
-
-        matcher = cv.FlannBasedMatcher()
-        matches = matcher.match(des1, des2)
-        matches = sorted(matches, key=lambda x: x.distance)
-
-        result = cv.drawMatches(note.template, kp1, image, kp2, matches[:10], None)
-        cv.imshow('result', result)
-        cv.waitKey(0)
-    '''
     hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV)
     
-    lower_white = np.array([0, 0, 200], dtype=np.uint8)
-    upper_white = np.array([255, 50, 255], dtype=np.uint8)
-
-    mask = np.zeros(image.shape[:2], np.uint8)
+    lower_white = np.array([25, 100, 100], dtype=np.uint8)
+    upper_white = np.array([35, 255, 255], dtype=np.uint8)
 
     mask = cv.inRange(hsv, lower_white, upper_white)
-
     masked_img = cv.bitwise_and(image, image, mask=mask)
 
     cv.imshow('masked', masked_img)
+    cv.waitKey(0)
+
+    # now we perform connected component analysis
+    gray = cv.cvtColor(cv.cvtColor(masked_img, cv.COLOR_HSV2BGR), cv.COLOR_BGR2GRAY)
+
+    ret, thresh = cv.threshold(gray, 1, 255, cv.THRESH_BINARY)
+    nlabels, labels, stats, centroids = cv.connectedComponentsWithStats(thresh, connectivity=8)
+
+    output = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8) 
+
+    for i in range(1, nlabels):
+        # Get the area of the connected component
+        area = stats[i, cv.CC_STAT_AREA]
+        # Get the bounding box coordinates of the connected component
+        x, y, w, h = stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP], stats[i, cv.CC_STAT_WIDTH], stats[i, cv.CC_STAT_HEIGHT]
+        # Draw a rectangle around the connected component
+        cv.rectangle(output, (x, y), (x + w, y + h), (0, 0, 255), 2)
+        # Print the area of the connected component
+        print("Connected component %d has area %d" % (i, area))
+
+    cv.imshow('connected', output)
+
     
 def main():
-    screen = cv.imread('./test-multiple-notes.png')
+    screen = cv.imread('./test-bar-notes.png')
     guitar_points = find_guitar(screen) 
     # crop_image(screen, guitar_points)
     note_bases = load_notes(NoteType.base)
     notes = load_notes(NoteType.regular)
+    
+    start = time.time()
     # find_note_bases(screen, note_bases)
     find_notes(screen, notes)
+    end = time.time()
+    print(end - start)
 
     #cv.imshow('blep', screen)
     cv.waitKey(0)
