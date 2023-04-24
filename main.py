@@ -145,17 +145,20 @@ def find_note_bases(image, notes):
 def find_notes(image, notes):
     hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV)
 
+    green_low = (55, 50, 100)
+    green_high = (65, 255, 255)
+
+    red_low = ((0, 50, 100), (175, 50, 100))
+    red_high = ((5, 255, 255), (179, 255, 255))
+
     yellow_low = (25, 100, 100)
     yellow_high = (35, 255, 255)
 
-    red_low = (170, 50, 50)
-    red_high = (179, 255, 255)
-
-    green_low = (55, 50, 100)
-    green_high = (65, 255, 255)
+    blue_low = (95, 50, 100)
+    blue_high = (105, 255, 255)
     
-    lower_white = np.array(green_low, dtype=np.uint8)
-    upper_white = np.array(green_high, dtype=np.uint8)
+    lower_white = np.array(red_low, dtype=np.uint8)
+    upper_white = np.array(red_high, dtype=np.uint8)
 
     mask = cv.inRange(hsv, lower_white, upper_white)
     masked_img = cv.bitwise_and(image, image, mask=mask)
