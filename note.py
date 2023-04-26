@@ -1,4 +1,11 @@
+import cv2 as cv
+import numpy as np
+
 from enum import StrEnum
+
+
+TOLERANCE = 0.8
+AREA_THRESHOLD = 20
 
 
 class NoteColour(StrEnum):
@@ -18,9 +25,6 @@ COLOUR_RANGE_HSV = {
 }
 
 
-TOLERANCE = 0.8
-
-
 class BaseNote:
     def __init__(self):
         self.template = None
@@ -36,6 +40,7 @@ class Note:
         self.base = BaseNote()
         self._load_base_note_template()
 
+
     def _load_base_note_template(self):
         note_filename = f'{self.colour}-note-base.png'
         note_path = os.path.join(self.notes_dir, note_filename)
@@ -43,6 +48,7 @@ class Note:
 
         self.base.template = note_template
         self.base.shape = (1440, 2560)
+
 
     def find_note_base(self, image):
         '''image must be in BGR'''
@@ -72,6 +78,7 @@ class Note:
         self.base.bounds = (top_left, bottom_right)
         return True
 
+
     def mask_note(self, image):
         '''image must be in HSV'''
 
@@ -90,4 +97,22 @@ class Note:
             total_mask = cv.bitwise_or(total_mask, masked_img)
         
         return total_mask
+
+    @staticmethod
+    def find_notes(self, image):
+        '''image must be in grayscale'''
+        _, threshold = cv.threshold(image, 1, 255, cv.THRESH_BINARY)
+        num_labels, labels, stats, centroids = cv.connectedComponentsWithStats(threshold, connectivity=8)
+
+        notes = [None] * (num_lables - 1)
+        for i in range(1, num_labels):
+            area = stats[i, cv.CC_STAT_AREA]
+            if area < AREA_THRESHOLD:
+                continue
+            x, y, w, h = stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP], stats[i, cv.CC_STAT_WIDTH], stats[i, cv.CC_STAT_HEIGHT]
+            # TODO: filter out if area is too small
+
+            notes.append((x, y, w, h))
+
+        return notes
 

@@ -89,121 +89,33 @@ def crop_image(image, bounds):
     # apply the mask to the image
     result = cv.bitwise_and(image, mask)
 
-    # display the cropped image
-    cv.imshow('guitar', result)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return result
 
 
-def load_notes(type, notes_path=DEFAULT_NOTES_PATH):
-    notes = {}
-    note_colours = [
-        ('green', (0, 255, 0)), 
-        ('red', (0, 0, 255)), 
-        ('yellow', (0, 255, 255)), 
-        ('blue', (255, 0, 0)), 
-        ('orange', (0, 165, 255))
-    ]
-    for note_colour_name, note_colour in note_colours:
-        note_filename = None
-        if type == NoteType.regular:
-            note_filename = f'{note_colour_name}-note.png'
-        if type == NoteType.base:
-            note_filename = f'{note_colour_name}-note-base.png'
-        note_path = os.path.join(notes_path, note_filename)
-        note_template = cv.imread(note_path)
-        notes[note_colour_name] = Note(note_template, note_colour, (1440, 2560))
-
-    return notes
-
-
-def find_note_bases(image, notes):
-    image_height, image_width, _ = image.shape
-    for note in notes.values():
-        # compute the scale relative to the note
-        scale_width = image_width / note.shape[1]
-        scale_height = image_height / note.shape[0]
-
-        # resize the note
-        note_template = cv.resize(note.template, (0, 0), fx=scale_width, fy=scale_height)
-        h, w = note_template.shape[0:2]
-
-        # execute the match algorithm
-        match_results = cv.matchTemplate(image, note_template, cv.TM_CCOEFF_NORMED)
-
-        # get the best result
-        min_val, max_val, min_loc, max_loc = cv.minMaxLoc(match_results)
-        top_left = max_loc
-        bottom_right = (top_left[0] + w, top_left[1] + h)
-        note.bounds = (top_left, bottom_right)
-
-        cv.rectangle(image, top_left, bottom_right, note.colour, 2)
-
-    return notes
-
-
-def find_notes(image, notes):
-    hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV)
-
-    green_low = (55, 50, 100)
-    green_high = (65, 255, 255)
-
-    red_low = ((0, 50, 100), (175, 50, 100))
-    red_high = ((5, 255, 255), (179, 255, 255))
-
-    yellow_low = (25, 100, 100)
-    yellow_high = (35, 255, 255)
-
-    blue_low = (95, 50, 100)
-    blue_high = (105, 255, 255)
-    
-    lower_white = np.array(red_low, dtype=np.uint8)
-    upper_white = np.array(red_high, dtype=np.uint8)
-
-    mask = cv.inRange(hsv, lower_white, upper_white)
-    masked_img = cv.bitwise_and(image, image, mask=mask)
-
-    cv.imshow('masked', masked_img)
-    cv.waitKey(0)
-
-    # now we perform connected component analysis
-    gray = cv.cvtColor(cv.cvtColor(masked_img, cv.COLOR_HSV2BGR), cv.COLOR_BGR2GRAY)
-
-    ret, thresh = cv.threshold(gray, 1, 255, cv.THRESH_BINARY)
-    nlabels, labels, stats, centroids = cv.connectedComponentsWithStats(thresh, connectivity=8)
-
-    output = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8) 
-
-    for i in range(1, nlabels):
-        # Get the area of the connected component
-        area = stats[i, cv.CC_STAT_AREA]
-        # Get the bounding box coordinates of the connected component
-        x, y, w, h = stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP], stats[i, cv.CC_STAT_WIDTH], stats[i, cv.CC_STAT_HEIGHT]
-        # Draw a rectangle around the connected component
-        cv.rectangle(output, (x, y), (x + w, y + h), (0, 0, 255), 2)
-        # Print the area of the connected component
-        print("Connected component %d has area %d" % (i, area))
-
-    cv.imshow('connected', output)
-
-    
 def main():
     screen = cv.imread('./test-multiple-notes.png')
+
+    notes = {
+        NoteType.GREEN: None,
+        NoteType.RED: None,
+        NoteType.YELLOW: None,
+        NoteType.BLUE: None,
+        NoteType.ORANGE: None,
+    }
+    for note_colour in notes.keys():
+        notes[note_colour] = Note(note_colour, DEFAULT_NOTES_PATH)
+
     guitar_points = find_guitar(screen) 
-    # crop_image(screen, guitar_points)
-    note_bases = load_notes(NoteType.base)
-    notes = load_notes(NoteType.regular)
-    
-    start = time.time()
-    # find_note_bases(screen, note_bases)
-    find_notes(screen, notes)
-    end = time.time()
-    print(end - start)
+    guitar_cropped_image = crop_image(screen, guitar_points)
 
-    #cv.imshow('blep', screen)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    masked_notes_image = np.zeros((screen.shape[0], screen.shape[1], 3), dtype=np.uint8)
+    for note in notes:
+        note.find_note_base(guitar_cropped_image)
+        masked_note_image = note.mask_note(guitar_cropped_image)
+        masked_notes_image = cv.bitwise_or(masked_notes_image, masked_note_image)
 
+    notes_coords = Note.find_notes(masked_notes_image)
+    # TODO: check if notes are within the bounds 
 
 if __name__ == "__main__":
     main()
