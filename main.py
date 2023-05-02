@@ -1,10 +1,11 @@
 import os
 import math
 import time
+import pdb
 import cv2 as cv
 import numpy as np
 
-from note import Note, NoteType
+from note import Note, NoteColour
 
 PATH = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_NOTES_PATH = os.path.join(PATH, './notes')
@@ -96,25 +97,28 @@ def main():
     screen = cv.imread('./test-multiple-notes.png')
 
     notes = {
-        NoteType.GREEN: None,
-        NoteType.RED: None,
-        NoteType.YELLOW: None,
-        NoteType.BLUE: None,
-        NoteType.ORANGE: None,
+        NoteColour.GREEN: None,
+        NoteColour.RED: None,
+        NoteColour.YELLOW: None,
+        NoteColour.BLUE: None,
+        NoteColour.ORANGE: None,
     }
     for note_colour in notes.keys():
         notes[note_colour] = Note(note_colour, DEFAULT_NOTES_PATH)
 
     guitar_points = find_guitar(screen) 
     guitar_cropped_image = crop_image(screen, guitar_points)
+    guitar_cropped_image_hsv = cv.cvtColor(guitar_cropped_image, cv.COLOR_BGR2HSV)
 
     masked_notes_image = np.zeros((screen.shape[0], screen.shape[1], 3), dtype=np.uint8)
-    for note in notes:
+    for note in notes.values():
         note.find_note_base(guitar_cropped_image)
-        masked_note_image = note.mask_note(guitar_cropped_image)
+        masked_note_image = note.mask_note(guitar_cropped_image_hsv)
         masked_notes_image = cv.bitwise_or(masked_notes_image, masked_note_image)
 
-    notes_coords = Note.find_notes(masked_notes_image)
+    _, _, masked_notes_image_grey = cv.split(masked_notes_image)
+
+    notes_coords = Note.find_notes(masked_notes_image_grey)
     # TODO: check if notes are within the bounds 
 
 if __name__ == "__main__":

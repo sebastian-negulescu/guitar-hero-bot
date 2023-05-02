@@ -1,14 +1,15 @@
+import os
 import cv2 as cv
 import numpy as np
 
-from enum import StrEnum
+from enum import Enum
 
 
 TOLERANCE = 0.8
 AREA_THRESHOLD = 20
 
 
-class NoteColour(StrEnum):
+class NoteColour(str, Enum):
     GREEN = 'green' 
     RED = 'red'
     YELLOW = 'yellow'
@@ -99,12 +100,13 @@ class Note:
         return total_mask
 
     @staticmethod
-    def find_notes(self, image):
+    def find_notes(image):
         '''image must be in grayscale'''
+
         _, threshold = cv.threshold(image, 1, 255, cv.THRESH_BINARY)
         num_labels, labels, stats, centroids = cv.connectedComponentsWithStats(threshold, connectivity=8)
 
-        notes = [None] * (num_lables - 1)
+        notes = [None] * (num_labels - 1)
         for i in range(1, num_labels):
             area = stats[i, cv.CC_STAT_AREA]
             if area < AREA_THRESHOLD:
