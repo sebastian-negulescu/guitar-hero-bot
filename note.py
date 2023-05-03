@@ -1,4 +1,5 @@
 import os
+import pdb
 import cv2 as cv
 import numpy as np
 
@@ -17,11 +18,12 @@ class NoteColour(str, Enum):
     ORANGE = 'orange' 
 
 
+# formatted ((low_hsv, high_hsv), (low_hsv, high_hsv), ...)
 COLOUR_RANGE_HSV = {
-    NoteColour.GREEN: ((55, 50, 100), (65, 255, 255)),
-    NoteColour.RED: (((0, 50, 100), (175, 50, 100)), ((5, 255, 255), (179, 255, 255))),
-    NoteColour.YELLOW: ((25, 100, 100), (35, 255, 255)),
-    NoteColour.BLUE: ((95, 50, 100), (105, 255, 255)),
+    NoteColour.GREEN: [[(55, 100, 100), (65, 255, 255)]],
+    NoteColour.RED: [[(0, 100, 100), (5, 255, 255)], [(175, 100, 100), (179, 255, 255)]],
+    NoteColour.YELLOW: [[(25, 100, 100), (35, 255, 255)]],
+    NoteColour.BLUE: [[(95, 100, 100), (105, 255, 255)]],
     NoteColour.ORANGE: (),
 }
 
@@ -83,12 +85,13 @@ class Note:
     def mask_note(self, image):
         '''image must be in HSV'''
 
-        lower_colours = COLOUR_RANGE_HSV[self.colour]
-        upper_colours = COLOUR_RANGE_HSV[self.colour]
-
         total_mask = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
-        
-        for lower_colour, upper_colour in zip(lower_colours, upper_colours):
+
+        shades = COLOUR_RANGE_HSV[self.colour]
+        for shade in shades:
+            lower_colour = shade[0]
+            upper_colour = shade[1]
+
             lower_colour_arr = np.array(lower_colour, dtype=np.uint8)
             upper_colour_arr = np.array(upper_colour, dtype=np.uint8)
 
@@ -106,7 +109,7 @@ class Note:
         _, threshold = cv.threshold(image, 1, 255, cv.THRESH_BINARY)
         num_labels, labels, stats, centroids = cv.connectedComponentsWithStats(threshold, connectivity=8)
 
-        notes = [None] * (num_labels - 1)
+        notes = []
         for i in range(1, num_labels):
             area = stats[i, cv.CC_STAT_AREA]
             if area < AREA_THRESHOLD:

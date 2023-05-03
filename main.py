@@ -119,7 +119,15 @@ def main():
     _, _, masked_notes_image_grey = cv.split(masked_notes_image)
 
     notes_coords = Note.find_notes(masked_notes_image_grey)
+
     # TODO: check if notes are within the bounds 
+
+    for note_coords in notes_coords:
+        cv.rectangle(screen, (note_coords[0], note_coords[1]), (note_coords[0] + note_coords[2], note_coords[1] + note_coords[3]), (0, 0, 255), 2)
+
+    cv.imshow('test', screen)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
