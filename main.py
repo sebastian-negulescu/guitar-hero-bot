@@ -81,16 +81,23 @@ def find_guitar(image):
  
 def crop_image(image, bounds):
     # create a mask with the same size as the image
-    mask = np.zeros_like(image)
+    triangle_mask = np.zeros_like(image)
 
     # create a white triangle on the mask
     triangle = np.array(bounds, dtype=np.int32)
-    cv.fillPoly(mask, [triangle], (255,255,255))
+    cv.fillPoly(triangle_mask, [triangle], (255,255,255))
 
     # apply the mask to the image
-    result = cv.bitwise_and(image, mask)
+    triangle_masked = cv.bitwise_and(image, triangle_mask)
 
-    return result
+    half_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    image_height, image_width = image.shape[:2]
+    half_mask[0:image_height, 0:image_width] = 255
+    half_mask[image_height//2:image_height, 0:image_width] = 255
+
+    half_masked = cv.bitwise_and(triangle_masked, triangle_masked, mask=half_mask)
+
+    return half_masked
 
 
 def main():
