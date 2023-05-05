@@ -1,12 +1,13 @@
 import os
 import pdb
+import math
 import cv2 as cv
 import numpy as np
 
 from enum import Enum
 
 
-TOLERANCE = 0.8
+TOLERANCE = 0.6
 AREA_THRESHOLD = 20
 
 
@@ -31,6 +32,7 @@ COLOUR_RANGE_HSV = {
 class BaseNote:
     def __init__(self):
         self.template = None
+        self.resolution = None
         self.shape = None
         self.bounds = None
 
@@ -50,21 +52,28 @@ class Note:
         note_template = cv.imread(note_path)
 
         self.base.template = note_template
-        self.base.shape = (1440, 2560)
+        self.base.resolution = (1440, 2560)
+        self.base.shape = note_template.shape
 
 
     def find_note_base(self, image):
         '''image must be in BGR'''
 
+        # pdb.set_trace()
+
         # determine the scale of the note to the image
         image_height, image_width, _ = image.shape
         
-        scale_height = image_height / self.base.shape[0]
-        scale_width = image_width / self.base.shape[1]
+        scale_height = image_height / self.base.resolution[0]
+        scale_width = image_width / self.base.resolution[1]
 
         # resize the note
         note_template = cv.resize(self.base.template, (0, 0), fx=scale_width, fy=scale_height)
         h, w = self.base.shape[0:2]
+
+        # scale the base note dimensions
+        h = math.floor(scale_height * h)
+        w = math.floor(scale_width * w)
 
         # execute the match algorithm
         match_results = cv.matchTemplate(image, note_template, cv.TM_CCOEFF_NORMED)
@@ -96,9 +105,12 @@ class Note:
             upper_colour_arr = np.array(upper_colour, dtype=np.uint8)
 
             mask = cv.inRange(image, lower_colour_arr, upper_colour_arr)
-            masked_img = cv.bitwise_and(image, image, mask=mask)
+            # mask out base note coordinates as well 
+            base_bounds = self.base.bounds
+            mask[base_bounds[0][0]:base_bounds[1][0], base_bounds[0][1]:base_bounds[1][1]] = 0
+            masked_image = cv.bitwise_and(image, image, mask=mask)
 
-            total_mask = cv.bitwise_or(total_mask, masked_img)
+            total_mask = cv.bitwise_or(total_mask, masked_image)
         
         return total_mask
 

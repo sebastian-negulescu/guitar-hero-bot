@@ -92,7 +92,6 @@ def crop_image(image, bounds):
 
     half_mask = np.zeros(image.shape[:2], dtype=np.uint8)
     image_height, image_width = image.shape[:2]
-    half_mask[0:image_height, 0:image_width] = 255
     half_mask[image_height//2:image_height, 0:image_width] = 255
 
     half_masked = cv.bitwise_and(triangle_masked, triangle_masked, mask=half_mask)
@@ -119,7 +118,9 @@ def main():
 
     masked_notes_image = np.zeros((screen.shape[0], screen.shape[1], 3), dtype=np.uint8)
     for note in notes.values():
-        note.find_note_base(guitar_cropped_image)
+        found = note.find_note_base(guitar_cropped_image)
+        assert found
+        # TODO: mask out base of note or check if area overlaps with base
         masked_note_image = note.mask_note(guitar_cropped_image_hsv)
         masked_notes_image = cv.bitwise_or(masked_notes_image, masked_note_image)
 
