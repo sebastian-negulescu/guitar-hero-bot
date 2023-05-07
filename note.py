@@ -91,10 +91,23 @@ class Note:
         return True
 
 
+    def mask_base(self, image):
+        '''image must be in BGR'''
+
+        mask = np.ones((image.shape[0], image.shape[1]), dtype=np.uint8)
+
+        top_left, bottom_right = self.base.bounds
+        cv.rectangle(mask, top_left, bottom_right, 0, -1)
+
+        masked_image = cv.bitwise_and(image, image, mask=mask)
+
+        return masked_image
+
+
     def mask_note(self, image):
         '''image must be in HSV'''
 
-        total_mask = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
+        total_masked_image = np.zeros_like(image, dtype=np.uint8)
 
         shades = COLOUR_RANGE_HSV[self.colour]
         for shade in shades:
@@ -105,14 +118,12 @@ class Note:
             upper_colour_arr = np.array(upper_colour, dtype=np.uint8)
 
             mask = cv.inRange(image, lower_colour_arr, upper_colour_arr)
-            # mask out base note coordinates as well 
-            base_bounds = self.base.bounds
-            mask[base_bounds[0][0]:base_bounds[1][0], base_bounds[0][1]:base_bounds[1][1]] = 0
             masked_image = cv.bitwise_and(image, image, mask=mask)
 
-            total_mask = cv.bitwise_or(total_mask, masked_image)
+            total_masked_image = cv.bitwise_or(total_masked_image, masked_image)
         
-        return total_mask
+        return total_masked_image
+
 
     @staticmethod
     def find_notes(image):

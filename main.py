@@ -114,14 +114,15 @@ def main():
 
     guitar_points = find_guitar(screen) 
     guitar_cropped_image = crop_image(screen, guitar_points)
-    guitar_cropped_image_hsv = cv.cvtColor(guitar_cropped_image, cv.COLOR_BGR2HSV)
 
-    masked_notes_image = np.zeros((screen.shape[0], screen.shape[1], 3), dtype=np.uint8)
+    masked_notes_image = np.zeros_like(screen, dtype=np.uint8)
     for note in notes.values():
         found = note.find_note_base(guitar_cropped_image)
-        assert found
-        # TODO: mask out base of note or check if area overlaps with base
-        masked_note_image = note.mask_note(guitar_cropped_image_hsv)
+
+        masked_base_image = note.mask_base(guitar_cropped_image)
+        masked_base_image_hsv = cv.cvtColor(masked_base_image, cv.COLOR_BGR2HSV)
+
+        masked_note_image = note.mask_note(masked_base_image_hsv)
         masked_notes_image = cv.bitwise_or(masked_notes_image, masked_note_image)
 
     _, _, masked_notes_image_grey = cv.split(masked_notes_image)
