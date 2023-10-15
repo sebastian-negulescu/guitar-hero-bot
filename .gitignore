@@ -1,4 +1,11 @@
 venv/
-__pycache__/
 using-venv.txt
+
+__pycache__/
+
+.vscode/
+
+.DS_Store
+
+old-project/
 *.xcf
