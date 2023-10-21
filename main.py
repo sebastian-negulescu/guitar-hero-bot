@@ -3,16 +3,18 @@ import time
 import cv2 as cv
 import numpy as np
 
-from enum import Enum
+from enum import Enum, auto
 
 from multiprocessing import Process
 
 TICK_HZ = 30
 
 class NoteColours(Enum):
-    RED = 0
-    GREEN = 1
-    BLUE = 2
+    GREEN = auto() 
+    RED = auto()
+    YELLOW = auto()
+    BLUE = auto()
+    ORANGE = auto()
 
 
 def note_routine():
