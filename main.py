@@ -1,4 +1,6 @@
 import time
+import signal
+import sys
 
 import cv2 as cv
 import numpy as np
@@ -7,8 +9,9 @@ from PIL import ImageGrab
 from enum import Enum, auto
 from multiprocessing import Process, Queue
 
-TICK_HZ = 30
-QUIT_VALUE = 113
+TICK_HZ = 5
+TIME_PER_FRAME = 1 / TICK_HZ
+QUIT = False
 
 class NoteColours(Enum):
     GREEN = auto() 
@@ -40,11 +43,19 @@ def note_routine(frames):
     print('finishing')
 
 
+def capture_interrupt(sig, frame):
+    # this will run on all the threads
+    QUIT = True
+    sys.exit(0)
+
 def shred():
     print('rock on!')
 
     note_queues = {}
     note_detectors = {}
+
+    signal.signal(signal.SIGINT, capture_interrupt)
+
     for note_colour in NoteColours:
         note_queues[note_colour] = Queue()
         note_detectors[note_colour] = Process(
@@ -55,16 +66,18 @@ def shred():
     for note_colour in NoteColours:
         note_detectors[note_colour].start()
 
-    while True:
-        frame_time = time.time()
+    while not QUIT:
+        frame_timestamp = time.time()
         frame = ImageGrab.grab()
-        print(time.time() - frame_time)
+
         for note_colour in NoteColours:
-            pass
+            note_queues[note_colour].put(TimeStamped(frame, frame_timestamp))
 
-        if cv.waitKey(1) == QUIT_VALUE:
-            break
+        end_time = time.time()
+        if TIME_PER_FRAME < end_time - frame_timestamp:
+            time.sleep(TIME_PER_FRAME - (end_time - frame_timestamp))
 
+    print('cleaning up')
     for note_colour in NoteColours:
         note_queues[note_colour].put(TimeStamped('quit'))
 
