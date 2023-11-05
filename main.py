@@ -2,9 +2,9 @@ import time
 
 import cv2 as cv
 import numpy as np
+from PIL import ImageGrab
 
 from enum import Enum, auto
-
 from multiprocessing import Process, Queue
 
 TICK_HZ = 30
@@ -57,6 +57,8 @@ def shred():
 
     while True:
         frame_time = time.time()
+        frame = ImageGrab.grab()
+        print(time.time() - frame_time)
         for note_colour in NoteColours:
             pass
 
