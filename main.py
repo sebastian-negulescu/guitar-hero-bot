@@ -1,5 +1,6 @@
 import time
 
+import pyautogui
 import cv2 as cv
 import numpy as np
 from PIL import ImageGrab
@@ -10,9 +11,11 @@ from multiprocessing import Process, Queue
 TICK_HZ = 5
 TIME_PER_FRAME = 1 / TICK_HZ
 QUIT = False
-REGION = (573, 911, 768, 64)
-WINDOW = (10, 10)
-DEFAULT_THRESHOLD = 150 * WINDOW[0] * WINDOW[1]
+# REGION = (573, 911, 768, 64)
+REGION_ABSOLUTE = (767, 1208, 1792, 1289)
+REGION = (767, 1208, 1025, 81)
+WINDOW = (20, 20)
+DEFAULT_THRESHOLD = 100 * WINDOW[0] * WINDOW[1]
 
 class NoteColours(Enum):
     GREEN = auto() 
@@ -20,6 +23,15 @@ class NoteColours(Enum):
     YELLOW = auto()
     BLUE = auto()
     ORANGE = auto()
+
+
+MAPPED_KEYS = {
+    NoteColours.GREEN: 'q',
+    NoteColours.RED: 'w',
+    NoteColours.YELLOW: 'e',
+    NoteColours.BLUE: 'r',
+    NoteColours.ORANGE: 't'
+}
 
 
 class TimeStamped:
@@ -48,12 +60,12 @@ def note_routine(colour, frames, threshold, inputs):
         start_range = (half[0] - WINDOW[0] // 2, half[1] - WINDOW[1] // 2)
         analysis_area = frame[start_range[0]:start_range[0] + WINDOW[0], 
                               start_range[1]:start_range[1] + WINDOW[1]]
-        accumulated_saturation = np.sum(analysis_area[::1])
+        # accumulated_saturation = np.sum(analysis_area[::1])
         accumulated_brightness = np.sum(analysis_area[::2])
-        signal_func.append(accumulated_brightness)
+        # signal_func.append(accumulated_brightness)
 
         if accumulated_brightness > threshold:
-            print(colour, accumulated_saturation, accumulated_brightness, threshold)
+            # print(colour, accumulated_saturation, accumulated_brightness, threshold)
             inputs.put(True)
         else:
             inputs.put(False)
@@ -97,26 +109,31 @@ def shred():
             time.sleep(TIME_PER_FRAME - (end_time - frame_timestamp))
     '''
 
-    video = cv.VideoCapture('testing-files/test-movie.mp4')
-    while video.isOpened():
-        ret, frame = video.read()
+    # video = cv.VideoCapture('testing-files/test-movie.mp4')
+    # while video.isOpened():
+        # ret, frame = video.read()
+    while not QUIT:
+        frame = ImageGrab.grab(REGION_ABSOLUTE)
+        frame = np.array(frame)
 
+        '''
         if not ret:
             break
+        '''
 
-        cropped_frame = frame[REGION[1]:REGION[1] + REGION[3], 
-                              REGION[0]:REGION[0] + REGION[2]]
-        cropped_frame_hsv = cv.cvtColor(cropped_frame, cv.COLOR_BGR2HSV)
+        cropped_frame_hsv = cv.cvtColor(frame, cv.COLOR_RGB2HSV)
 
         for index, note_colour in enumerate(NoteColours):
             start_range = REGION[2] * index // len(NoteColours)
             end_range = REGION[2] * (index + 1) // len(NoteColours)
             note_frame = cropped_frame_hsv[:, start_range:end_range]
-            note_queues[note_colour].put(TimeStamped(note_frame))
+            note_queues[note_colour].put(TimeStamped(note_frame)t
 
-        height, width, _ = cropped_frame.shape
+        # height, width, _ = cropped_frame.shape
+        strum = False
         for index, note_colour in enumerate(NoteColours):
             if input_queues[note_colour].get() == True:
+                '''
                 cv.rectangle(
                     cropped_frame,
                     (width * index // len(NoteColours), 0),
@@ -124,10 +141,22 @@ def shred():
                     (255, 255, 255),
                     5
                 )
-        cv.imshow('frame', cropped_frame)
-        cv.imshow('hsv frame', cropped_frame_hsv)
+                '''
+                pyautogui.keyDown(MAPPED_KEYS[note_colour])
+                strum = True
 
-        cv.waitKey()
+        if strum:
+            print('strumming...')
+            pyautogui.press('down')
+            
+        for key in MAPPED_KEYS.values():
+            pyautogui.keyUp(key)
+
+        # cv.imshow('frame', cropped_frame)
+        # cv.imshow('hsv frame', cropped_frame_hsv)
+
+
+        # cv.waitKey()
         '''
         if cv.waitKey(1) == ord('q'):
             break
