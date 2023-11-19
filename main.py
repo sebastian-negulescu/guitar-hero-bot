@@ -6,16 +6,14 @@ import numpy as np
 from PIL import ImageGrab
 
 from enum import Enum, auto
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Lock
 
-TICK_HZ = 5
-TIME_PER_FRAME = 1 / TICK_HZ
-QUIT = False
-# REGION = (573, 911, 768, 64)
-REGION_ABSOLUTE = (767, 1208, 1792, 1289)
-REGION = (767, 1208, 1025, 81)
+MAX_COUNTER = 2**16
+
+REGION = (573, 911, 768, 64)
+# REGION = (767, 1208, 1025, 81)
 WINDOW = (20, 20)
-DEFAULT_THRESHOLD = 100 * WINDOW[0] * WINDOW[1]
+DEFAULT_THRESHOLD = 150 * WINDOW[0] * WINDOW[1]
 
 class NoteColours(Enum):
     GREEN = auto() 
@@ -33,138 +31,69 @@ MAPPED_KEYS = {
     NoteColours.ORANGE: 't'
 }
 
+def note_routine(colour, region, threshold, press, lock):
+    print('starting', colour)
+    counter = 0
 
-class TimeStamped:
-    def __init__(self, obj, terminate=False):
-        self.obj = obj
-        self.terminate = terminate
-        self.timestamp = time.time()
-
-
-def note_routine(colour, frames, threshold, inputs):
-    print('starting')
-    timestamped_obj = None
-    signal_func = []
-    while True: 
-        # check queue
-        try:
-            timestamped_obj = frames.get()
-            if timestamped_obj.terminate:
-                break
-        except ValueError:
-            # queue is closed
-            break
-
-        frame = timestamped_obj.obj
-        half = (len(frame) // 2, len(frame[0]) // 2)
-        start_range = (half[0] - WINDOW[0] // 2, half[1] - WINDOW[1] // 2)
-        analysis_area = frame[start_range[0]:start_range[0] + WINDOW[0], 
-                              start_range[1]:start_range[1] + WINDOW[1]]
-        # accumulated_saturation = np.sum(analysis_area[::1])
-        accumulated_brightness = np.sum(analysis_area[::2])
-        # signal_func.append(accumulated_brightness)
+    while True:
+        # lock.acquire()
+        image = ImageGrab.grab(bbox=region)
+        # lock.release()
+        analysis_section = cv.cvtColor(np.array(image), cv.COLOR_RGB2HSV)
+        accumulated_brightness = np.sum(analysis_section[::2]) # sum up the V part of the section  
 
         if accumulated_brightness > threshold:
-            # print(colour, accumulated_saturation, accumulated_brightness, threshold)
-            inputs.put(True)
+            press.put((True, counter))
         else:
-            inputs.put(False)
+            press.put((False, counter))
+        counter += 1
+        if counter == MAX_COUNTER:
+            counter = 0 # reset the counter so we don't overflow
 
-        # check if the time is still valid
-    # print(signal_func)
     print('finishing')
 
 
 def shred():
     print('rock on!')
 
+    pillow_lock = Lock()
     note_queues = {}
-    input_queues = {}
     note_detectors = {}
 
-    for note_colour in NoteColours:
+    num_notes = len(NoteColours)
+    for index, note_colour in enumerate(NoteColours):
+        top_left_x = REGION[0] + index * REGION[2] // num_notes
+        top_left_y = REGION[1]
+        width = REGION[2] // num_notes
+        height = REGION[3]
+        bottom_right_x = top_left_x + width
+        bottom_right_y = top_left_y + height
+
+        note_region = (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
         note_queues[note_colour] = Queue()
-        input_queues[note_colour] = Queue()
+
         note_detectors[note_colour] = Process(
             target=note_routine, 
             args=(note_colour.value, 
-                  note_queues[note_colour], 
+                  note_region,
                   DEFAULT_THRESHOLD, 
-                  input_queues[note_colour],)
+                  note_queues[note_colour],
+                  pillow_lock,)
         )
 
     for note_colour in NoteColours:
         note_detectors[note_colour].start()
 
-    ''' replace with a video capture while figuring things out
-    while not QUIT:
-        frame_timestamp = time.time()
-        frame = ImageGrab.grab(REGION)
-
+    counter = 0
+    while True:
         for note_colour in NoteColours:
-            note_queues[note_colour].put(TimeStamped(frame, frame_timestamp))
+            press, note_count = note_queues[note_colour].get()
 
-        end_time = time.time()
-        if TIME_PER_FRAME > end_time - frame_timestamp:
-            time.sleep(TIME_PER_FRAME - (end_time - frame_timestamp))
-    '''
-
-    # video = cv.VideoCapture('testing-files/test-movie.mp4')
-    # while video.isOpened():
-        # ret, frame = video.read()
-    while not QUIT:
-        frame = ImageGrab.grab(REGION_ABSOLUTE)
-        frame = np.array(frame)
-
-        '''
-        if not ret:
-            break
-        '''
-
-        cropped_frame_hsv = cv.cvtColor(frame, cv.COLOR_RGB2HSV)
-
-        for index, note_colour in enumerate(NoteColours):
-            start_range = REGION[2] * index // len(NoteColours)
-            end_range = REGION[2] * (index + 1) // len(NoteColours)
-            note_frame = cropped_frame_hsv[:, start_range:end_range]
-            note_queues[note_colour].put(TimeStamped(note_frame)t
-
-        # height, width, _ = cropped_frame.shape
-        strum = False
-        for index, note_colour in enumerate(NoteColours):
-            if input_queues[note_colour].get() == True:
-                '''
-                cv.rectangle(
-                    cropped_frame,
-                    (width * index // len(NoteColours), 0),
-                    (width * (index + 1) // len(NoteColours), height),
-                    (255, 255, 255),
-                    5
-                )
-                '''
-                pyautogui.keyDown(MAPPED_KEYS[note_colour])
-                strum = True
-
-        if strum:
-            print('strumming...')
-            pyautogui.press('down')
-            
-        for key in MAPPED_KEYS.values():
-            pyautogui.keyUp(key)
-
-        # cv.imshow('frame', cropped_frame)
-        # cv.imshow('hsv frame', cropped_frame_hsv)
-
-
-        # cv.waitKey()
-        '''
-        if cv.waitKey(1) == ord('q'):
-            break
-        '''
-
-    for note_colour in NoteColours:
-        note_queues[note_colour].put(TimeStamped(None, terminate=True))
-
+        print(counter)
+        counter += 1
+        if counter == MAX_COUNTER:
+            counter = 0
+        
     for note_colour in NoteColours:
         note_detectors[note_colour].join()
 
