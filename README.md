@@ -1,4 +1,4 @@
 # Guitar Hero Bot
 
-using `Python 3.8.10`
-requires `opencv_python, numpy, pillow, keyboard`
+using `Python 3.13.5`
+requires `opencv_python, numpy, mss, keyboard`
