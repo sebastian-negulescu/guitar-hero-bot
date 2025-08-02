@@ -14,6 +14,6 @@ def grab_frame(
 
 
 def grab_image(image_path: str) -> list[cv.UMat]:
-    src = cv.imread(cv.samples.findFile(image_path), cv.IMREAD_GRAYSCALE)
+    src = cv.imread(cv.samples.findFile(image_path))
     assert src is not None
     return [src]  # for generator compatibility
