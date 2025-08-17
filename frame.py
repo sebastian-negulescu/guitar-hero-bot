@@ -1,16 +1,17 @@
-import mss
+from PIL import ImageGrab
 import cv2 as cv
+import numpy as np
 
 from threading import Event
-from typing import Generator
+from typing import Generator, Any
 
 
 def grab_frame(
     stop_event: Event
-) -> Generator[mss.base.ScreenShot, None, None]:
-    with mss.mss() as sct:
-        while not stop_event.is_set():
-            yield sct.grab()
+) -> Generator[Any, None, None]:
+    while not stop_event.is_set():
+        im = ImageGrab.grab()
+        yield cv.cvtColor(np.array(im), cv.COLOR_RGB2BGR)
 
 
 def grab_image(image_path: str) -> list[cv.UMat]:

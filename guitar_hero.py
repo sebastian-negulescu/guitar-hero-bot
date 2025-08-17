@@ -1,5 +1,6 @@
 import pdb
 import math
+import uinput
 import cv2 as cv
 import numpy as np
 
@@ -105,43 +106,11 @@ def get_bar(img: cv.UMat) -> cv.UMat:
 
 def shred():
     stop_event = Event()
-    frames = grab_frame_from_video(stop_event, "./testing-files/guitar_hero.mkv")
+    frames = grab_frame(stop_event)
     # frames = grab_image("./testing-files/reference-frame.png")
-    for f in frames:
-        note_detection = get_note(f)
-        notes_exist = detect_note(note_detection)
-
-        bounds_s = ((NOTE_BOUNDS[1] * SCALE_TO[1]) // SCALE_FROM[1], (NOTE_BOUNDS[0] * SCALE_TO[0]) // SCALE_FROM[0])
-        note_colour = cv.cvtColor(note_detection, cv.COLOR_GRAY2BGR)
-
-        for note, note_exists in notes_exist.items():
-            center = NOTE_CENTER[note]
-            center_s = ((center[1] * SCALE_TO[1]) // SCALE_FROM[1], (center[0] * SCALE_TO[0]) // SCALE_FROM[0])
-            if note_exists:
-                cv.line(note_colour,
-                        (center_s[0] - bounds_s[0], center_s[1] - bounds_s[1]),
-                        (center_s[0] - bounds_s[0], center_s[1] + bounds_s[1]),
-                        (0, 0, 255), 3, cv.LINE_AA)
-                cv.line(note_colour,
-                        (center_s[0] - bounds_s[0], center_s[1] - bounds_s[1]),
-                        (center_s[0] + bounds_s[0], center_s[1] - bounds_s[1]),
-                        (0, 0, 255), 3, cv.LINE_AA)
-                cv.line(note_colour,
-                        (center_s[0] + bounds_s[0], center_s[1] + bounds_s[1]),
-                        (center_s[0] - bounds_s[0], center_s[1] + bounds_s[1]),
-                        (0, 0, 255), 3, cv.LINE_AA)
-                cv.line(note_colour,
-                        (center_s[0] + bounds_s[0], center_s[1] + bounds_s[1]),
-                        (center_s[0] + bounds_s[0], center_s[1] - bounds_s[1]),
-                        (0, 0, 255), 3, cv.LINE_AA)
-
-        cv.imshow("frame", note_colour)
-
-        key = cv.waitKey(0)
-        if key == ord("q"):
-            stop_event.set()
-
-    cv.destroyAllWindows()
+    with uinput.Device([uinput.KEY_A, uinput.KEY_S, uinput.KEY_D, uinput.KEY_K]) as device:
+        for f in frames:
+            pass
 
 
 if __name__ == "__main__":
