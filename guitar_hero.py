@@ -104,13 +104,25 @@ def get_bar(img: cv.UMat) -> cv.UMat:
     return img_thresh
 
 
+def playground(img: cv.UMat) -> cv.UMat:
+    img_hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+    # at least 25% saturation and 75% luminance
+    value_mask = cv.inRange(img_hsv, np.array([0, 255//4, 3 * 255//4]), np.array([179, 255, 255]))
+    img_masked = cv.bitwise_and(img_hsv, img_hsv, mask=value_mask)
+    return img_masked
+
+
 def shred():
     stop_event = Event()
-    frames = grab_frame(stop_event)
-    # frames = grab_image("./testing-files/reference-frame.png")
-    with uinput.Device([uinput.KEY_A, uinput.KEY_S, uinput.KEY_D, uinput.KEY_K]) as device:
-        for f in frames:
-            pass
+    # frames = grab_frame(stop_event)
+    frames = grab_image("./testing-files/pictures/IMG_4178.JPG")
+    for f in frames:
+        im = playground(f)
+        cv.imshow("frame", im)
+
+        key = cv.waitKey(0)
+        while key != ord("q"):
+            key = cv.waitKey(0)
 
 
 if __name__ == "__main__":
