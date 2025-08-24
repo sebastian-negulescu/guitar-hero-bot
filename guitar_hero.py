@@ -53,7 +53,7 @@ def get_lines(img: cv.UMat) -> cv.UMat:
     THETA = np.pi / 180
     THRESHOLD = 50
     lines = cv.HoughLinesP(img_smoothed, RHO, THETA, THRESHOLD,
-                           lines=None, minLineLength=250, maxLineGap=2)
+                           lines=None, minLineLength=500, maxLineGap=2)
 
     return lines
 
@@ -118,6 +118,35 @@ def shred():
     frames = grab_image("./testing-files/pictures/IMG_4178.JPG")
     for f in frames:
         im = playground(f)
+        lines = get_lines(f)
+        horizontal = np.array((1, 0))
+        if lines is not None:
+            for line_a in lines:
+                line_a = line_a[0]
+                line_a_vec = np.array((line_a[2] - line_a[0], line_a[3] - line_a[1]))
+                line_a_unit_vec = line_a_vec / np.linalg.norm(line_a_vec)
+
+                horizon_dot = np.dot(horizontal, line_a_unit_vec)
+                if math.isclose(horizon_dot, math.cos(0)) or math.isclose(horizon_dot, math.cos(math.pi)):
+                    continue
+
+                for line_b in lines:
+                    line_b = line_b[0]
+                    # check if they form angle you are looking for
+                    line_b_vec = np.array((line_b[2] - line_b[0], line_b[3] - line_b[1]))
+                    line_b_unit_vec = line_b_vec / np.linalg.norm(line_b_vec)
+
+                    horizon_dot = np.dot(horizontal, line_a_unit_vec)
+                    if math.isclose(horizon_dot, math.cos(0)) or math.isclose(horizon_dot, math.cos(math.pi)):
+                        continue
+
+                    lines_dot = np.dot(line_a_unit_vec, line_b_unit_vec)
+                    if math.isclose(lines_dot, math.cos(60 * 2 * math.pi / 360), abs_tol=1):
+                        print("match")
+
+                cv.line(im, (line_a[0], line_a[1]), (line_a[2], line_a[3]), (0,0,255), 3, cv.LINE_AA)
+
+
         cv.imshow("frame", im)
 
         key = cv.waitKey(0)
