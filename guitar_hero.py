@@ -112,6 +112,14 @@ def playground(img: cv.UMat) -> cv.UMat:
     return img_masked
 
 
+def property_test(line) -> bool:
+    pdb.set_trace()
+    line_vec = np.array((line[2] - line[0], line[3] - line[1]))
+    line_unit_vec = line_vec / np.linalg.norm(line_vec)
+    horizon_dot = np.dot(horizontal, line_unit_vec)
+    return not (math.isclose(horizon_dot, math.cos(0)) or math.isclose(horizon_dot, math.cos(math.pi)))
+
+
 def shred():
     stop_event = Event()
     # frames = grab_frame(stop_event)
@@ -121,6 +129,10 @@ def shred():
         lines = get_lines(f)
         horizontal = np.array((1, 0))
         if lines is not None:
+            filtered_lines = [line[0] for line in lines]
+            filtered_lines = [line for line in lines if property_test(line)]
+            print(len(filtered_lines))
+
             for line_a in lines:
                 line_a = line_a[0]
                 line_a_vec = np.array((line_a[2] - line_a[0], line_a[3] - line_a[1]))
@@ -142,7 +154,7 @@ def shred():
 
                     lines_dot = np.dot(line_a_unit_vec, line_b_unit_vec)
                     if math.isclose(lines_dot, math.cos(60 * 2 * math.pi / 360), abs_tol=1):
-                        print("match")
+                        pass
 
                 cv.line(im, (line_a[0], line_a[1]), (line_a[2], line_a[3]), (0,0,255), 3, cv.LINE_AA)
 
