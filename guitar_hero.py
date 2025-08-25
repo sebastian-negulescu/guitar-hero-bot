@@ -113,7 +113,7 @@ def playground(img: cv.UMat) -> cv.UMat:
 
 
 def property_test(line) -> bool:
-    pdb.set_trace()
+    horizontal = np.array((1, 0))
     line_vec = np.array((line[2] - line[0], line[3] - line[1]))
     line_unit_vec = line_vec / np.linalg.norm(line_vec)
     horizon_dot = np.dot(horizontal, line_unit_vec)
@@ -127,30 +127,18 @@ def shred():
     for f in frames:
         im = playground(f)
         lines = get_lines(f)
-        horizontal = np.array((1, 0))
         if lines is not None:
             filtered_lines = [line[0] for line in lines]
-            filtered_lines = [line for line in lines if property_test(line)]
-            print(len(filtered_lines))
+            filtered_lines = [line for line in filtered_lines if property_test(line)]
 
-            for line_a in lines:
-                line_a = line_a[0]
+            for line_a in filtered_lines:
                 line_a_vec = np.array((line_a[2] - line_a[0], line_a[3] - line_a[1]))
                 line_a_unit_vec = line_a_vec / np.linalg.norm(line_a_vec)
 
-                horizon_dot = np.dot(horizontal, line_a_unit_vec)
-                if math.isclose(horizon_dot, math.cos(0)) or math.isclose(horizon_dot, math.cos(math.pi)):
-                    continue
-
-                for line_b in lines:
-                    line_b = line_b[0]
+                for line_b in filtered_lines:
                     # check if they form angle you are looking for
                     line_b_vec = np.array((line_b[2] - line_b[0], line_b[3] - line_b[1]))
                     line_b_unit_vec = line_b_vec / np.linalg.norm(line_b_vec)
-
-                    horizon_dot = np.dot(horizontal, line_a_unit_vec)
-                    if math.isclose(horizon_dot, math.cos(0)) or math.isclose(horizon_dot, math.cos(math.pi)):
-                        continue
 
                     lines_dot = np.dot(line_a_unit_vec, line_b_unit_vec)
                     if math.isclose(lines_dot, math.cos(60 * 2 * math.pi / 360), abs_tol=1):
