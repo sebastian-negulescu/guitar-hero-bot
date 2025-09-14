@@ -1,3 +1,4 @@
+import pdb
 import cv2 as cv
 import numpy as np
 
@@ -13,6 +14,8 @@ BOUNDING_POLYGON = np.array([
     (1650, 1020),
     (910, 1020),
 ])
+
+MIN_AREA = 256
 
 
 def create_bounding_polygons(bounding_polygon):
@@ -30,11 +33,11 @@ def create_bounding_polygons(bounding_polygon):
 BOUNDING_POLYGONS = create_bounding_polygons(BOUNDING_POLYGON)
 
 NOTE_MASKS = [
-    ((115, 135), 60, 40),
-    ((350, 10), 60, 40),
-    ((50, 65), 70, 40),
-    ((0, 0), 0, 0),
-    ((0, 0), 0, 0),
+    (((115, 135),), 60, 40),
+    (((350, 360), (0, 10)), 60, 40),
+    (((50, 65),), 70, 40),
+    (((360, 360),), 100, 100),
+    (((360, 360),), 100, 100),
 ]
 
 
@@ -55,22 +58,37 @@ def main():
             bound_masked = cv.bitwise_and(cropped, cropped, mask=mask)
 
             # apply other mask
-            h_min = note_mask[0][0] // 2
-            h_max = note_mask[0][1] // 2
             s_min = round(note_mask[1] * 255 / 100)
             v_min = round(note_mask[2] * 255 / 100)
+            note_masked = np.zeros(bound_masked.shape, np.uint8)
+            for h in note_mask[0]:
+                h_min = h[0] // 2
+                h_max = h[1] // 2
 
-            min_mask = cv.inRange(bound_masked, np.array((h_min, s_min, v_min)), np.array((179, 255, 255)))
-            min_masked = cv.bitwise_and(bound_masked, bound_masked, mask=min_mask)
-
-            max_mask = cv.inRange(bound_masked, np.array((0, s_min, v_min)), np.array((h_max, 255, 255)))
-            max_masked = cv.bitwise_and(bound_masked, bound_masked, mask=max_mask)
-
-            note_masked = cv.bitwise_or(min_masked, max_masked)
+                h_mask = cv.inRange(bound_masked, np.array((h_min, s_min, v_min)), np.array((h_max, 255, 255)))
+                part_note_masked = cv.bitwise_and(bound_masked, bound_masked, mask=h_mask)
+                note_masked = cv.bitwise_or(part_note_masked, note_masked)
 
             # get area of solid regions
+            notes = cv.cvtColor(note_masked, cv.COLOR_HSV2BGR)
+            notes_grey = cv.cvtColor(notes, cv.COLOR_BGR2GRAY)
+            _, notes_grey = cv.threshold(notes_grey, 10, 255, cv.THRESH_BINARY)
 
-            cv.imshow("frame", note_masked)
+            contours, hierarchy = cv.findContours(notes_grey, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+            bounding_boxes = [cv.boundingRect(contour) for contour in contours]
+            filtered_bounding_boxes = []
+            for idx, bb in enumerate(bounding_boxes):
+                x, y, w, h = bb
+                area = w * h
+                if area < MIN_AREA:
+                    continue
+                filtered_bounding_boxes.append(np.array(((x, y),
+                                                         (x + w, y),
+                                                         (x + w, y + h),
+                                                         (x, y + h))))
+            cv.drawContours(notes, filtered_bounding_boxes, -1, (0, 255, 0), -1, cv.LINE_AA)
+
+            cv.imshow("frame", notes)
 
             key = cv.waitKey(0)
             while key != ord("q"):
