@@ -1,4 +1,5 @@
 import pdb
+import time
 import cv2 as cv
 import numpy as np
 
@@ -14,8 +15,6 @@ BOUNDING_POLYGON = np.array([
     (1650, 1020),
     (910, 1020),
 ])
-
-MIN_AREA = 256
 
 
 def create_bounding_polygons(bounding_polygon):
@@ -40,12 +39,29 @@ NOTE_MASKS = [
     (((360, 360),), 100, 100),
 ]
 
+NOTE_AREA_THRESHOLDS = [
+    256,
+    256,
+    256,
+    256,
+    256,
+]
+
+
+NOTE_TRACKING = [
+    [],
+    [],
+    [],
+    [],
+    [],
+]
+
 
 def main():
     frames = grab_image("./testing-files/2025-09-13-150719_hyprshot.png")
     for f in frames:
         frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
-        for bounding_polygon, note_mask in zip(BOUNDING_POLYGONS, NOTE_MASKS):
+        for bounding_polygon, note_mask, area_threshold, note_tracking in zip(BOUNDING_POLYGONS, NOTE_MASKS, NOTE_AREA_THRESHOLDS, NOTE_TRACKING):
             # get cropped note lane
             bounding_box = cv.boundingRect(bounding_polygon)
             x, y, w, h = bounding_box
@@ -80,13 +96,36 @@ def main():
             for idx, bb in enumerate(bounding_boxes):
                 x, y, w, h = bb
                 area = w * h
-                if area < MIN_AREA:
-                    continue
-                filtered_bounding_boxes.append(np.array(((x, y),
-                                                         (x + w, y),
-                                                         (x + w, y + h),
-                                                         (x, y + h))))
-            cv.drawContours(notes, filtered_bounding_boxes, -1, (0, 255, 0), -1, cv.LINE_AA)
+                if area >= area_threshold:
+                    filtered_bounding_boxes.append(
+                        np.array(((x, y),
+                                  (x + w, y),
+                                  (x + w, y + h),
+                                  (x, y + h))))
+
+            unmatched_bounding_boxes = sorted(filtered_bounding_boxes, key=lambda x: x[0][1], reverse=True)
+            tracked_notes_to_delete = set()
+            for t_idx, tracked_note in enumerate(note_tracking):
+                t_pos = tracked_note[0][1]
+                found = False
+                for n_idx, bb in unmatched_bounding_boxes:
+                    n_pos = bb[0][1]
+                    if t_pos < n_pos:
+                        # new note position is farther down screen than tracked position
+                        note_tracking[t_idx] = bb
+                        del unmatched_bounding_boxes[n_idx]
+                        found = True
+                        break
+                if not found:
+                    tracked_notes_to_delete.add(t_idx)
+
+            for idx in tracked_notes_to_delete:
+                del note_tracking[idx]
+
+            for note in reversed(unmatched_bounding_boxes):
+                note_tracking.insert(0, note)
+
+            cv.drawContours(notes, note_tracking, -1, (0, 255, 0), -1, cv.LINE_AA)
 
             cv.imshow("frame", notes)
 

@@ -123,13 +123,14 @@ def property_test(line) -> bool:
 def shred():
     stop_event = Event()
     # frames = grab_frame(stop_event)
-    frames = grab_image("./testing-files/pictures/IMG_4178.JPG")
+    frames = grab_image("./testing-files/2025-08-12-201230_hyprshot.png")
     for f in frames:
+        """
         im = playground(f)
         lines = get_lines(f)
         if lines is not None:
-            filtered_lines = [line[0] for line in lines]
-            filtered_lines = [line for line in filtered_lines if property_test(line)]
+            lines = [line[0] for line in lines]
+            filtered_lines = [line for line in lines if property_test(line)]
 
             for line_a in filtered_lines:
                 line_a_vec = np.array((line_a[2] - line_a[0], line_a[3] - line_a[1]))
@@ -142,12 +143,18 @@ def shred():
 
                     lines_dot = np.dot(line_a_unit_vec, line_b_unit_vec)
                     if math.isclose(lines_dot, math.cos(60 * 2 * math.pi / 360), abs_tol=1):
-                        pass
+                        cv.line(im, (line_a[0], line_a[1]), (line_a[2], line_a[3]), (0,0,255), 3, cv.LINE_AA)
+        """
 
-                cv.line(im, (line_a[0], line_a[1]), (line_a[2], line_a[3]), (0,0,255), 3, cv.LINE_AA)
+        """
+        lines = get_lines(f)
+        if lines is not None:
+            lines = [line[0] for line in lines]
+            for line in lines:
+                cv.line(f, (line[0], line[1]), (line[2], line[3]), (0,0,255), 3, cv.LINE_AA)
+        """
 
-
-        cv.imshow("frame", im)
+        cv.imshow("frame", f)
 
         key = cv.waitKey(0)
         while key != ord("q"):
