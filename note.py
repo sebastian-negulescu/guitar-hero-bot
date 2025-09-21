@@ -3,18 +3,26 @@ import time
 import cv2 as cv
 import numpy as np
 
-from frame import grab_image
+from frame import grab_image, grab_frame_from_video
+from threading import Event
 
-SCALE_FROM = (2160, 1440)
+SCALE_FROM = (2560, 1440)
 SCALE_TO = (1920, 1080)
 
+
+def scale(points, scale_from, scale_to):
+    for idx, point in enumerate(points):
+        points[idx] = (round(point[0] * scale_to[0] / scale_from[0]), round(point[1] * scale_to[1] / scale_from[1]))
+    return points
+
+
 # first is top-left, working clockwise
-BOUNDING_POLYGON = np.array([
-    (1080, 710),
-    (1480, 710),
+BOUNDING_POLYGON = scale(np.array([
+    (963, 920),
+    (1596, 920),
     (1650, 1020),
     (910, 1020),
-])
+]), SCALE_FROM, SCALE_TO)
 
 
 def create_bounding_polygons(bounding_polygon):
@@ -58,12 +66,13 @@ NOTE_TRACKING = [
 
 
 class Note:
-    positions = []
-    velocities = []
-    update_time = None
+    def __init__(self):
+        self.positions = []
+        self.velocities = []
+        self.update_time = None
 
 
-def match_notes(tracked_notes, unmatched_notes):
+def match_notes(tracked_notes, unmatched_notes, frame_time):
     unmatched_notes.sort(key=lambda x: x[1], reverse=True)
     notes_to_delete = set()
     for t_idx, t_note in enumerate(tracked_notes):
@@ -72,7 +81,18 @@ def match_notes(tracked_notes, unmatched_notes):
         for u_idx, u_note in enumerate(unmatched_notes):
             u_y = u_note[1]
             if t_y <= u_y:
+                u_center = (u_note[0] + u_note[2], u_note[1] + u_note[3])
+                t_pos = t_note.positions[-1]
+                t_center = (t_pos[0] + t_pos[2], t_pos[1] + t_pos[3])
+
+                delta_position = (u_center[0] - t_center[0], u_center[1] - t_center[1])
+                delta_time = frame_time - t_note.update_time
+                velocity = (delta_position[0] / delta_time, delta_position[1] / delta_time)
+
                 t_note.positions.append(u_note)
+                t_note.velocities.append(velocity)
+                t_note.update_time = frame_time
+
                 del unmatched_notes[u_idx]
                 found = True
                 break
@@ -85,16 +105,20 @@ def match_notes(tracked_notes, unmatched_notes):
     for u_note in reversed(unmatched_notes):
         note = Note()
         note.positions.append(u_note)
+        note.update_time = frame_time
         tracked_notes.insert(0, note)
 
     return tracked_notes
 
 
 def main():
-    frames = grab_image("./testing-files/2025-09-13-150719_hyprshot.png")
+    stop_event = Event()
+    # frames = grab_image("./testing-files/test_image.png")
+    frames = grab_frame_from_video(stop_event, "./testing-files/some_might_say_second_vid.mkv")
     for f in frames:
+        frame_time = time.monotonic_ns()
         frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
-        for bounding_polygon, note_mask, area_threshold, note_tracking in zip(BOUNDING_POLYGONS, NOTE_MASKS, NOTE_AREA_THRESHOLDS, NOTE_TRACKING):
+        for idx, (bounding_polygon, note_mask, area_threshold) in enumerate(zip(BOUNDING_POLYGONS, NOTE_MASKS, NOTE_AREA_THRESHOLDS)):
             # get cropped note lane
             bounding_box = cv.boundingRect(bounding_polygon)
             x, y, w, h = bounding_box
@@ -125,18 +149,22 @@ def main():
 
             contours, hierarchy = cv.findContours(notes_grey, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
             bounding_boxes = [cv.boundingRect(contour) for contour in contours]
+            area_threshold = round(area_threshold * (SCALE_TO[0] * SCALE_TO[1]) / (SCALE_FROM[0] * SCALE_FROM[1]))
             filtered_bounding_boxes = [bb for bb in bounding_boxes if bb[2] * bb[3] > area_threshold]
 
-            note_tracking = match_notes(note_tracking, filtered_bounding_boxes)
-            pdb.set_trace()
+            converted_bounding_boxes = [np.array(((bb[0], bb[1]), (bb[0] + bb[2], bb[1]), (bb[0] + bb[2], bb[1] + bb[3]), (bb[0], bb[1] + bb[3]))) for bb in filtered_bounding_boxes]
 
-            """
-            cv.imshow("frame", notes)
+            cv.drawContours(notes, converted_bounding_boxes, -1, (255, 0, 0), -1, cv.LINE_AA)
+
+            note_tracking = NOTE_TRACKING[idx]
+            note_tracking = match_notes(note_tracking, filtered_bounding_boxes, frame_time)
+            NOTE_TRACKING[idx] = note_tracking
+
+            cv.imshow("cropped", notes)
 
             key = cv.waitKey(0)
             while key != ord("q"):
                 key = cv.waitKey(0)
-            """
 
 
 if __name__ == "__main__":

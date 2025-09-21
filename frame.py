@@ -17,7 +17,7 @@ def grab_frame(
 def grab_image(image_path: str) -> list[cv.UMat]:
     src = cv.imread(cv.samples.findFile(image_path))
     assert src is not None
-    return [src]  # for generator compatibility
+    return [src, src, src]  # for generator compatibility
 
 
 def grab_frame_from_video(
