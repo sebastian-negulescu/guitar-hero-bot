@@ -11,13 +11,17 @@ SCALE_TO = (1920, 1080)
 
 
 def scale(points, scale_from, scale_to):
-    for idx, point in enumerate(points):
-        points[idx] = (round(point[0] * scale_to[0] / scale_from[0]), round(point[1] * scale_to[1] / scale_from[1]))
-    return points
+    scaled_points = []
+    for point in points:
+        scaled_point = []
+        for dim, scale_from_d, scale_to_d in zip(point, scale_from, scale_to):
+            scaled_point.append(round(dim * scale_to_d / scale_from_d))
+        scaled_points.append(tuple(scaled_point))
+    return scaled_points
 
 
 # first is top-left, working clockwise
-BOUNDING_POLYGON = scale(np.array([
+GUITAR_SECTION = scale(np.array([
     (963, 920),
     (1596, 920),
     (1650, 1020),
@@ -25,19 +29,26 @@ BOUNDING_POLYGON = scale(np.array([
 ]), SCALE_FROM, SCALE_TO)
 
 
-def create_bounding_polygons(bounding_polygon):
-    num_polygons = 5
-    spacing = np.array((bounding_polygon[1][0] - bounding_polygon[0][0], bounding_polygon[2][0] - bounding_polygon[3][0])) // num_polygons
-    bounding_polygons = []
-    last_edge = np.array((bounding_polygon[0], bounding_polygon[3]))
-    for i in range(num_polygons):
-        bounding_polygons.append(np.array([last_edge[0], last_edge[0] + np.array((spacing[0], 0)), last_edge[1] + np.array((spacing[1], 0)), last_edge[1]]))
-        last_edge = np.array((bounding_polygons[-1][1], bounding_polygons[-1][2]))
+def create_strings(guitar):
+    num_strings = 5
+    spacing = np.array(
+        (guitar[1][0] - guitar[0][0],
+         guitar[2][0] - guitar[3][0])
+    ) // num_strings
 
-    return bounding_polygons
+    strings = []
+    last_edge = np.array((guitar[0], guitar[3]))
+    for i in range(num_strings):
+        strings.append(
+            np.array([last_edge[0], last_edge[0] + np.array((spacing[0], 0)),
+                      last_edge[1] + np.array((spacing[1], 0)), last_edge[1]]))
+        last_edge = np.array((strings[-1][1],
+                              strings[-1][2]))
+
+    return strings
 
 
-BOUNDING_POLYGONS = create_bounding_polygons(BOUNDING_POLYGON)
+STRING_SECTIONS = create_strings(GUITAR_SECTION)
 
 NOTE_MASKS = [
     (((115, 135),), 60, 40),
@@ -56,7 +67,14 @@ NOTE_AREA_THRESHOLDS = [
 ]
 
 
-NOTE_TRACKING = [
+def create_note_threshold(bottom_y):
+    RELATIVE_BOUNDS = scale((29, 142), SCALE_FROM, SCALE_TO)
+    w = scale((0.214 * bottom_y + 126.6), SCALE_FROM, SCALE_TO)
+    h = RELATIVE_BOUNDS[0] * w / RELATIVE_BOUNDS[1]
+    return w * h * 0.5
+
+
+note_tracking = [
     [],
     [],
     [],
@@ -111,6 +129,22 @@ def match_notes(tracked_notes, unmatched_notes, frame_time):
     return tracked_notes
 
 
+def draw_bb_on_note(notes, filtered_note_bb):
+    converted_bounding_boxes = [np.array(((bb[0], bb[1]),
+                                          (bb[0] + bb[2], bb[1]),
+                                          (bb[0] + bb[2], bb[1] + bb[3]),
+                                          (bb[0], bb[1] + bb[3])))
+                                for bb in filtered_note_bb]
+    cv.drawContours(notes,
+                    converted_bounding_boxes,
+                    -1,
+                    (255, 0, 0),
+                    -1,
+                    cv.LINE_AA)
+
+    return notes
+
+
 def main():
     stop_event = Event()
     # frames = grab_image("./testing-files/test_image.png")
@@ -118,28 +152,33 @@ def main():
     for f in frames:
         frame_time = time.monotonic_ns()
         frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
-        for idx, (bounding_polygon, note_mask, area_threshold) in enumerate(zip(BOUNDING_POLYGONS, NOTE_MASKS, NOTE_AREA_THRESHOLDS)):
+        for idx, (string, note_mask) in enumerate(zip(STRING_SECTIONS, NOTE_MASKS)):
             # get cropped note lane
-            bounding_box = cv.boundingRect(bounding_polygon)
-            x, y, w, h = bounding_box
-            cropped = frame_hsv[y:y+h, x:x+w].copy()
+            string_bb = cv.boundingRect(string)
+            x, y, w, h = string_bb
+            string_cropped = frame_hsv[y:y+h, x:x+w].copy()
 
-            relative_polygon = bounding_polygon - bounding_polygon.min(axis=0)
-            mask = np.zeros(cropped.shape[:2], np.uint8)
-            cv.drawContours(mask, [relative_polygon], -1, (255, 255, 255), -1, cv.LINE_AA)
+            relative_string = string - string.min(axis=0)
+            mask = np.zeros(string_cropped.shape[:2], np.uint8)
+            cv.drawContours(
+                mask, [relative_string], -1, (255, 255, 255), -1, cv.LINE_AA)
 
-            bound_masked = cv.bitwise_and(cropped, cropped, mask=mask)
+            string_masked = cv.bitwise_and(
+                string_cropped, string_cropped, mask=mask)
 
-            # apply other mask
+            # apply note colour mask
             s_min = round(note_mask[1] * 255 / 100)
             v_min = round(note_mask[2] * 255 / 100)
-            note_masked = np.zeros(bound_masked.shape, np.uint8)
+            note_masked = np.zeros(string_masked.shape, np.uint8)
             for h in note_mask[0]:
                 h_min = h[0] // 2
                 h_max = h[1] // 2
 
-                h_mask = cv.inRange(bound_masked, np.array((h_min, s_min, v_min)), np.array((h_max, 255, 255)))
-                part_note_masked = cv.bitwise_and(bound_masked, bound_masked, mask=h_mask)
+                h_mask = cv.inRange(string_masked,
+                                    np.array((h_min, s_min, v_min)),
+                                    np.array((h_max, 255, 255)))
+                part_note_masked = cv.bitwise_and(
+                    string_masked, string_masked, mask=h_mask)
                 note_masked = cv.bitwise_or(part_note_masked, note_masked)
 
             # get area of solid regions
@@ -147,18 +186,13 @@ def main():
             notes_grey = cv.cvtColor(notes, cv.COLOR_BGR2GRAY)
             _, notes_grey = cv.threshold(notes_grey, 10, 255, cv.THRESH_BINARY)
 
-            contours, hierarchy = cv.findContours(notes_grey, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-            bounding_boxes = [cv.boundingRect(contour) for contour in contours]
-            area_threshold = round(area_threshold * (SCALE_TO[0] * SCALE_TO[1]) / (SCALE_FROM[0] * SCALE_FROM[1]))
-            filtered_bounding_boxes = [bb for bb in bounding_boxes if bb[2] * bb[3] > area_threshold]
+            note_contours, _ = cv.findContours(
+                notes_grey, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+            note_bb = [cv.boundingRect(contour) for contour in note_contours]
+            filtered_note_bb = [bb for bb in note_bb
+                                if bb[2] * bb[3] > create_note_threshold(bb[1] + bb[3])]
 
-            converted_bounding_boxes = [np.array(((bb[0], bb[1]), (bb[0] + bb[2], bb[1]), (bb[0] + bb[2], bb[1] + bb[3]), (bb[0], bb[1] + bb[3]))) for bb in filtered_bounding_boxes]
-
-            cv.drawContours(notes, converted_bounding_boxes, -1, (255, 0, 0), -1, cv.LINE_AA)
-
-            note_tracking = NOTE_TRACKING[idx]
-            note_tracking = match_notes(note_tracking, filtered_bounding_boxes, frame_time)
-            NOTE_TRACKING[idx] = note_tracking
+            note_tracking[idx] = match_notes(note_tracking[idx], filtered_note_bb, frame_time)
 
             cv.imshow("cropped", notes)
 
