@@ -7,6 +7,7 @@ from frame import grab_image, grab_frame_from_video
 from threading import Event
 
 SCALE_FROM = (2560, 1440)
+# SCALE_TO = (2560, 1440)
 SCALE_TO = (1920, 1080)
 
 
@@ -14,8 +15,8 @@ def scale(points, scale_from, scale_to):
     scaled_points = []
     for point in points:
         scaled_point = []
-        for dim, scale_from_d, scale_to_d in zip(point, scale_from, scale_to):
-            scaled_point.append(round(dim * scale_to_d / scale_from_d))
+        for dim, p in enumerate(point):
+            scaled_point.append(round(p * scale_to[dim] / scale_from[dim]))
         scaled_points.append(tuple(scaled_point))
     return scaled_points
 
@@ -53,7 +54,7 @@ STRING_SECTIONS = create_strings(GUITAR_SECTION)
 NOTE_MASKS = [
     (((115, 135),), 60, 40),
     (((350, 360), (0, 10)), 60, 40),
-    (((50, 65),), 70, 40),
+    (((50, 65),), 60, 40),
     (((360, 360),), 100, 100),
     (((360, 360),), 100, 100),
 ]
@@ -68,8 +69,8 @@ NOTE_AREA_THRESHOLDS = [
 
 
 def create_note_threshold(bottom_y):
-    RELATIVE_BOUNDS = scale((29, 142), SCALE_FROM, SCALE_TO)
-    w = scale((0.214 * bottom_y + 126.6), SCALE_FROM, SCALE_TO)
+    RELATIVE_BOUNDS = scale([(29, 142)], SCALE_FROM, SCALE_TO)[0]
+    w = scale([[0.214 * bottom_y + 126.6]], SCALE_FROM, SCALE_TO)[0][0]
     h = RELATIVE_BOUNDS[0] * w / RELATIVE_BOUNDS[1]
     return w * h * 0.5
 
@@ -147,8 +148,8 @@ def draw_bb_on_note(notes, filtered_note_bb):
 
 def main():
     stop_event = Event()
-    # frames = grab_image("./testing-files/test_image.png")
-    frames = grab_frame_from_video(stop_event, "./testing-files/some_might_say_second_vid.mkv")
+    # frames = grab_image("./testing-files/red_yellow_red.png")
+    frames = grab_frame_from_video(stop_event, "./testing-files/some_might_say.mkv")
     for f in frames:
         frame_time = time.monotonic_ns()
         frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
@@ -192,13 +193,20 @@ def main():
             filtered_note_bb = [bb for bb in note_bb
                                 if bb[2] * bb[3] > create_note_threshold(bb[1] + bb[3])]
 
+            # show the matched areas on the image
+            note_contours_scaled = []
+            for contour in note_contours:
+                scaled_contour = np.array([[point[0][0] + x, point[0][1] + y] for point in contour])
+                note_contours_scaled.append(scaled_contour)
+            cv.drawContours(f, note_contours_scaled, -1, (255, 0, 0), -1, cv.LINE_AA)
+
             note_tracking[idx] = match_notes(note_tracking[idx], filtered_note_bb, frame_time)
 
-            cv.imshow("cropped", notes)
+        cv.imshow("frame", f)
 
+        key = cv.waitKey(0)
+        while key != ord("q"):
             key = cv.waitKey(0)
-            while key != ord("q"):
-                key = cv.waitKey(0)
 
 
 if __name__ == "__main__":
