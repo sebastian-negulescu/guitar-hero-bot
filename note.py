@@ -1,5 +1,6 @@
 import pdb
 import time
+import math
 import cv2 as cv
 import numpy as np
 
@@ -68,50 +69,29 @@ NOTE_AREA_THRESHOLDS = [
 ]
 
 
-def create_note_threshold(bottom_y):
+def check_note_proportions(note_bb):
+    bottom_y = note_bb[1] + note_bb[3]
+
     RELATIVE_BOUNDS = scale([(29, 142)], SCALE_FROM, SCALE_TO)[0]
     w = scale([[0.214 * bottom_y + 126.6]], SCALE_FROM, SCALE_TO)[0][0]
     h = RELATIVE_BOUNDS[0] * w / RELATIVE_BOUNDS[1]
-    return w * h * 0.5
 
-
-note_tracking = [
-    [],
-    [],
-    [],
-    [],
-    [],
-]
-
-
-class Note:
-    def __init__(self):
-        self.positions = []
-        self.velocities = []
-        self.update_time = None
+    return (math.isclose(w, note_bb[2], rel_tol=0.2) and
+            math.isclose(h, note_bb[3], rel_tol=0.2))
 
 
 def match_notes(tracked_notes, unmatched_notes, frame_time):
-    unmatched_notes.sort(key=lambda x: x[1], reverse=True)
+    unmatched_notes.sort(key=lambda note: note[1], reverse=True)
     notes_to_delete = set()
+
     for t_idx, t_note in enumerate(tracked_notes):
         t_y = t_note.positions[-1][1]
         found = False
         for u_idx, u_note in enumerate(unmatched_notes):
             u_y = u_note[1]
             if t_y <= u_y:
-                u_center = (u_note[0] + u_note[2], u_note[1] + u_note[3])
-                t_pos = t_note.positions[-1]
-                t_center = (t_pos[0] + t_pos[2], t_pos[1] + t_pos[3])
-
-                delta_position = (u_center[0] - t_center[0], u_center[1] - t_center[1])
-                delta_time = frame_time - t_note.update_time
-                velocity = (delta_position[0] / delta_time, delta_position[1] / delta_time)
-
-                t_note.positions.append(u_note)
-                t_note.velocities.append(velocity)
-                t_note.update_time = frame_time
-
+                u_pos = (u_note[0] + u_note[2] / 2, u_note[1] + u_note[3])
+                t_note.add_position(u_pos, frame_time)
                 del unmatched_notes[u_idx]
                 found = True
                 break
@@ -119,12 +99,12 @@ def match_notes(tracked_notes, unmatched_notes, frame_time):
         if not found:
             notes_to_delete.add(t_idx)
 
-    tracked_notes = [t_note for t_idx, t_note in enumerate(tracked_notes) if t_idx not in notes_to_delete]
+    tracked_notes = [t_note for t_idx, t_note in enumerate(tracked_notes)
+                     if t_idx not in notes_to_delete]
 
     for u_note in reversed(unmatched_notes):
-        note = Note()
-        note.positions.append(u_note)
-        note.update_time = frame_time
+        u_pos = (u_note[0] + u_note[2] / 2, u_note[1] + u_note[3])
+        note = Note(u_note, frame_time)
         tracked_notes.insert(0, note)
 
     return tracked_notes
@@ -146,7 +126,27 @@ def draw_bb_on_note(notes, filtered_note_bb):
     return notes
 
 
+class Note:
+    def __init__(self, pos, t):
+        self.positions = [pos]
+        self.times = [t]
+        self.velocities = []
+
+    def add_position(self, pos, t):
+        last_pos = self.positions[-1]
+        last_time = self.times[-1]
+
+        delta_pos = (pos[0] - last_pos[0], pos[1] - last_pos[1])
+        delta_time = t - last_time
+
+        self.positions.append(pos)
+        self.times.append(t)
+        self.velocities.append((delta_pos[0] / delta_time, delta_pos[1] / delta_time))
+
+
 def main():
+    note_tracking = [[]] * 5
+
     stop_event = Event()
     # frames = grab_image("./testing-files/red_yellow_red.png")
     frames = grab_frame_from_video(stop_event, "./testing-files/some_might_say.mkv")
@@ -189,9 +189,8 @@ def main():
 
             note_contours, _ = cv.findContours(
                 notes_grey, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-            note_bb = [cv.boundingRect(contour) for contour in note_contours]
-            filtered_note_bb = [bb for bb in note_bb
-                                if bb[2] * bb[3] > create_note_threshold(bb[1] + bb[3])]
+            note_bbs = [cv.boundingRect(contour) for contour in note_contours]
+            filtered_note_bbs = list(filter(check_note_proportions, note_bbs))
 
             # show the matched areas on the image
             note_contours_scaled = []
@@ -200,8 +199,20 @@ def main():
                 note_contours_scaled.append(scaled_contour)
             cv.drawContours(f, note_contours_scaled, -1, (255, 0, 0), -1, cv.LINE_AA)
 
-            note_tracking[idx] = match_notes(note_tracking[idx], filtered_note_bb, frame_time)
+            # draw the bounding box on the image
+            for bb in filtered_note_bbs:
+                scaled_bb = (bb[0] + x, bb[1] + y, bb[2], bb[3])
+                cv.rectangle(f,
+                             (scaled_bb[0], scaled_bb[1]),
+                             (scaled_bb[0] + scaled_bb[2],
+                              scaled_bb[1] + scaled_bb[3]),
+                             (0, 255, 0),
+                             2,
+                             cv.LINE_AA)
 
+            note_tracking[idx] = match_notes(note_tracking[idx], filtered_note_bbs, frame_time)
+
+        # print(sum(map(lambda x: len(x), note_tracking)))
         cv.imshow("frame", f)
 
         key = cv.waitKey(0)
