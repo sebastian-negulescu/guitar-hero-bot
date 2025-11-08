@@ -117,6 +117,7 @@ def match_notes(tracked_notes, unmatched_notes, frame_time):
         print("POS DELTA", last_pos[1] - tracked_notes[t_idx].positions[0][1])
         print("VELOCITY", pos_delta / time_delta)
         print("POS", last_pos)
+        print("BASELINE", BASELINE)
 
     tracked_notes = [t_note for t_idx, t_note in enumerate(tracked_notes)
                      if t_idx not in notes_to_delete]
