@@ -30,6 +30,8 @@ GUITAR_SECTION = scale(np.array([
     (910, 1020),
 ]), SCALE_FROM, SCALE_TO)
 
+BASELINE = scale([[1260]], SCALE_FROM[1:], SCALE_TO[1:])[0][0]
+
 
 def create_strings(guitar):
     num_strings = 5
@@ -81,7 +83,7 @@ def check_note_proportions(note_bb):
 
 
 def match_notes(tracked_notes, unmatched_notes, frame_time):
-    unmatched_notes.sort(key=lambda note: note[1], reverse=True)
+    unmatched_notes.sort(key=lambda note: note[1])
     notes_to_delete = set()
 
     for t_idx, t_note in enumerate(tracked_notes):
@@ -90,7 +92,7 @@ def match_notes(tracked_notes, unmatched_notes, frame_time):
         for u_idx, u_note in enumerate(unmatched_notes):
             u_y = u_note[1]
             if t_y <= u_y:
-                u_pos = (u_note[0] + u_note[2] / 2, u_note[1] + u_note[3])
+                u_pos = (u_note[0] + u_note[2] / 2, u_y)
                 t_note.add_position(u_pos, frame_time)
                 del unmatched_notes[u_idx]
                 found = True
@@ -99,15 +101,32 @@ def match_notes(tracked_notes, unmatched_notes, frame_time):
         if not found:
             notes_to_delete.add(t_idx)
 
+    predicted_times = []
+    for t_idx in notes_to_delete:
+        last_pos = tracked_notes[t_idx].positions[-1]
+        last_time = tracked_notes[t_idx].times[-1]
+        time_delta = last_time - tracked_notes[t_idx].times[0]
+        pos_delta = last_pos[1] - tracked_notes[t_idx].positions[0][1]
+        velocity = pos_delta / time_delta
+        delta_pos = BASELINE - last_pos[1]
+        delta_time = delta_pos / velocity
+        predicted_times.append(last_time + delta_time)
+        print("TIMES", last_time, tracked_notes[t_idx].times[0])
+        print("PRED TIME", last_time + delta_time)
+        print("TIME DELTA", time_delta)
+        print("POS DELTA", last_pos[1] - tracked_notes[t_idx].positions[0][1])
+        print("VELOCITY", pos_delta / time_delta)
+        print("POS", last_pos)
+
     tracked_notes = [t_note for t_idx, t_note in enumerate(tracked_notes)
                      if t_idx not in notes_to_delete]
 
     for u_note in reversed(unmatched_notes):
-        u_pos = (u_note[0] + u_note[2] / 2, u_note[1] + u_note[3])
-        note = Note(u_note, frame_time)
+        u_pos = (u_note[0] + u_note[2] / 2, u_note[1])
+        note = Note(u_pos, frame_time)
         tracked_notes.insert(0, note)
 
-    return tracked_notes
+    return tracked_notes, predicted_times
 
 
 def draw_bb_on_note(notes, filtered_note_bb):
@@ -133,27 +152,21 @@ class Note:
         self.velocities = []
 
     def add_position(self, pos, t):
-        last_pos = self.positions[-1]
-        last_time = self.times[-1]
-
-        delta_pos = (pos[0] - last_pos[0], pos[1] - last_pos[1])
-        delta_time = t - last_time
-
         self.positions.append(pos)
         self.times.append(t)
-        self.velocities.append((delta_pos[0] / delta_time, delta_pos[1] / delta_time))
 
 
 def main():
     note_tracking = [[]] * 5
+    time_tracking = [[]] * 5
 
     stop_event = Event()
     # frames = grab_image("./testing-files/red_yellow_red.png")
     frames = grab_frame_from_video(stop_event, "./testing-files/some_might_say.mkv")
-    for f in frames:
+    for frame_count, f in enumerate(frames):
         frame_time = time.monotonic_ns()
         frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
-        for idx, (string, note_mask) in enumerate(zip(STRING_SECTIONS, NOTE_MASKS)):
+        for note_idx, (string, note_mask) in enumerate(zip(STRING_SECTIONS, NOTE_MASKS)):
             # get cropped note lane
             string_bb = cv.boundingRect(string)
             x, y, w, h = string_bb
@@ -200,6 +213,7 @@ def main():
             cv.drawContours(f, note_contours_scaled, -1, (255, 0, 0), -1, cv.LINE_AA)
 
             # draw the bounding box on the image
+            scaled_filtered_note_bbs = []
             for bb in filtered_note_bbs:
                 scaled_bb = (bb[0] + x, bb[1] + y, bb[2], bb[3])
                 cv.rectangle(f,
@@ -209,9 +223,19 @@ def main():
                              (0, 255, 0),
                              2,
                              cv.LINE_AA)
+                scaled_filtered_note_bbs.append(scaled_bb)
 
-            note_tracking[idx] = match_notes(note_tracking[idx], filtered_note_bbs, frame_time)
+            note_tracking[note_idx], predicted_times = match_notes(
+                note_tracking[note_idx], scaled_filtered_note_bbs, frame_count)
+            time_tracking[note_idx].extend(predicted_times)
 
+        for note, note_time_tracking in enumerate(time_tracking):
+            for idx in reversed(range(len(note_time_tracking))):
+                estimate = note_time_tracking[idx]
+                if frame_count >= estimate:
+                    print("HIT")
+                    del note_time_tracking[idx]
+                    break
         # print(sum(map(lambda x: len(x), note_tracking)))
         cv.imshow("frame", f)
 
