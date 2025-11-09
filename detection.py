@@ -18,16 +18,28 @@ def scale(points, scale_from, scale_to):
     return scaled_points
 
 
+"""
 SENSORS = scale((
     (900, 1190),
     (1092, 1190),
     (1280, 1190),
     (1470, 1190),
     (1655, 1190)), SCALE_FROM, SCALE_TO)
+"""
+
+SENSORS = scale((
+    (896, 1188),
+    (1086, 1188),
+    (1275, 1188),
+    (1463, 1188),
+    (1651, 1189)), SCALE_FROM, SCALE_TO)
+
+SENSOR_BB = scale([(10, 10)], SCALE_FROM, SCALE_TO)[0]
+
 
 S_MAX = 7 * 255 / 100
-V_MIN = 82 * 255 / 100
-V_MAX = 88 * 255 / 100
+V_MIN = 85 * 255 / 100
+V_MAX = 87 * 255 / 100
 
 
 def main():
@@ -37,12 +49,23 @@ def main():
     for f in frames:
         frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
         for sensor in SENSORS:
+            """
             pixel_colour = frame_hsv[sensor[1]][sensor[0]]
+            print(pixel_colour)
             if (pixel_colour[1] <= S_MAX and
                     (V_MIN <= pixel_colour[2] and pixel_colour[2] <= V_MAX)):
                 print("NOTE")
                 print(pixel_colour)
+            """
+            for x in range(SENSOR_BB[0]):
+                for y in range(SENSOR_BB[1]):
+                    pixel_colour = frame_hsv[sensor[1] + y][sensor[0] + x]
+                    if (pixel_colour[1] <= S_MAX and
+                            (V_MIN <= pixel_colour[2] and pixel_colour[2] <= V_MAX)):
+                        print("NOTE")
+                        break
 
+        print()
         cv.imshow("frame", f)
 
         key = cv.waitKey(0)
