@@ -42,29 +42,41 @@ V_MIN = 85 * 255 / 100
 V_MAX = 87 * 255 / 100
 
 
+previous_detected = [False] * 5
+
+
 def main():
     stop_event = Event()
     frames = grab_frame_from_video(stop_event, "./testing-files/some_might_say.mkv")
     # index frame with [y][x][c]
     for f in frames:
         frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
-        for sensor in SENSORS:
-            """
-            pixel_colour = frame_hsv[sensor[1]][sensor[0]]
-            print(pixel_colour)
-            if (pixel_colour[1] <= S_MAX and
-                    (V_MIN <= pixel_colour[2] and pixel_colour[2] <= V_MAX)):
-                print("NOTE")
-                print(pixel_colour)
-            """
+        strum = [False] * 5
+        for lane, sensor in enumerate(SENSORS):
+            # TODO: check sensor bounding box with function
+            detected_note = False
             for x in range(SENSOR_BB[0]):
+                if detected_note:
+                    break
+
                 for y in range(SENSOR_BB[1]):
+                    if detected_note:
+                        break
+
                     pixel_colour = frame_hsv[sensor[1] + y][sensor[0] + x]
                     if (pixel_colour[1] <= S_MAX and
                             (V_MIN <= pixel_colour[2] and pixel_colour[2] <= V_MAX)):
-                        print("NOTE")
+                        detected_note = True
 
-        print()
+            if detected_note:
+                if not previous_detected[lane]:
+                    previous_detected[lane] = True
+                    strum[lane] = True
+            else:
+                previous_detected[lane] = False
+
+        if True in strum:
+            print("STRUM")
         cv.imshow("frame", f)
 
         key = cv.waitKey(0)
