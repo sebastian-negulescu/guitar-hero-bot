@@ -63,7 +63,6 @@ def main():
                     if (pixel_colour[1] <= S_MAX and
                             (V_MIN <= pixel_colour[2] and pixel_colour[2] <= V_MAX)):
                         print("NOTE")
-                        break
 
         print()
         cv.imshow("frame", f)
