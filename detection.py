@@ -18,15 +18,6 @@ def scale(points, scale_from, scale_to):
     return scaled_points
 
 
-"""
-SENSORS = scale((
-    (900, 1190),
-    (1092, 1190),
-    (1280, 1190),
-    (1470, 1190),
-    (1655, 1190)), SCALE_FROM, SCALE_TO)
-"""
-
 SENSORS = scale((
     (896, 1188),
     (1086, 1188),
@@ -45,6 +36,14 @@ V_MAX = 87 * 255 / 100
 previous_detected = [False] * 5
 
 
+def show_frame(frame):
+    cv.imshow("frame", frame)
+
+    key = cv.waitKey(0)
+    while key != ord("q"):
+        key = cv.waitKey(0)
+
+
 def main():
     stop_event = Event()
     frames = grab_frame_from_video(stop_event, "./testing-files/some_might_say.mkv")
@@ -55,6 +54,13 @@ def main():
         for lane, sensor in enumerate(SENSORS):
             # TODO: check sensor bounding box with function
             detected_note = False
+
+            def detected_func(colour):
+                return (colour[1] <= S_MAX and
+                        (V_MIN <= colour[2] and colour[2] <= V_MAX))
+
+            detection_window = frame_hsv[SENSOR_BB[0]:SENSOR_BB[1]]
+
             for x in range(SENSOR_BB[0]):
                 if detected_note:
                     break
@@ -77,11 +83,8 @@ def main():
 
         if True in strum:
             print("STRUM")
-        cv.imshow("frame", f)
 
-        key = cv.waitKey(0)
-        while key != ord("q"):
-            key = cv.waitKey(0)
+        show_frame(f)
 
 
 if __name__ == "__main__":
