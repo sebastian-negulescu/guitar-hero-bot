@@ -3,6 +3,7 @@ from gi.repository import GLib
 import cv2 as cv
 import itertools
 
+
 class ScreenCapture:
     DESKTOP_PATH = "/org/freedesktop/portal/desktop"
     PORTAL_PREFIX = "org.freedesktop.portal"
@@ -109,8 +110,12 @@ class ScreenCapture:
         node_id = self.__start_screencast()
         pipeline = (
             f"pipewiresrc path={node_id} ! "
+            "video/x-raw ! "
             "videoconvert ! "
             "video/x-raw,format=BGR ! "
+            "videoconvert ! "
+            "videorate ! "
+            "video/x-raw,framerate=30/1 ! "
             "appsink drop=1")
         capture = cv.VideoCapture(pipeline, cv.CAP_GSTREAMER)
         if not capture.isOpened():
