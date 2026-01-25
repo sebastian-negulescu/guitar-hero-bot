@@ -109,14 +109,12 @@ class ScreenCapture:
     def generate_capture_object(self) -> cv.VideoCapture:
         node_id = self.__start_screencast()
         pipeline = (
-            f"pipewiresrc path={node_id} ! "
-            "video/x-raw ! "
-            "videoconvert ! "
-            "video/x-raw,format=BGR ! "
-            "videoconvert ! "
+            f"pipewiresrc path={node_id} do-timestamp=true always-copy=true ! "
             "videorate ! "
             "video/x-raw,framerate=30/1 ! "
-            "appsink drop=1")
+            "videoconvert ! "
+            "video/x-raw,format=BGRA ! "  # use 4-byte conversion and get BGR using OpenCV
+            "appsink drop=true max-buffers=1")
         capture = cv.VideoCapture(pipeline, cv.CAP_GSTREAMER)
         if not capture.isOpened():
             raise Exception(f"Could not open capture to node: {node_id}")

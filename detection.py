@@ -49,22 +49,27 @@ def show_frame(frame):
 
 
 def main():
-    # fourcc = cv.VideoWriter_fourcc(*'XVID')
-    # out = cv.VideoWriter('output.avi', fourcc, 30.0, SCALE_TO)
+    fourcc = cv.VideoWriter_fourcc(*'FFV1')
+    out = cv.VideoWriter('output_2.avi', fourcc, 30.0, SCALE_TO)
     times = open("times.txt", "w")
-    g = guitar.Guitar()
-    # frames = capture.ScreenCapture().generate_capture_object()
-    e = Event()
-    frames = grab_frame_from_video(e, "output.avi")
+    # g = guitar.Guitar()
+    frames = capture.ScreenCapture().generate_capture_object()
+    # e = Event()
+    # frames = grab_frame_from_video(e, "output.avi")
     # index frame with [y][x][c]
     try:
-        # while True:
-        for f in frames:
+        while True:
+            # for f in frames:
             start_time = time.time()
-            # ret, f = frames.read()
-            # out.write(f)
-            # if not ret:
-            #    break
+            ret, f = frames.read()
+            if f is None:
+                continue
+            cvt_frame = cv.cvtColor(f, cv.COLOR_BGRA2BGR)
+            # show_frame(cvt_frame)
+            out.write(cvt_frame)
+            if not ret:
+                break
+            continue
             frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
             strum = False
             for lane, sensor in enumerate(SENSORS):
