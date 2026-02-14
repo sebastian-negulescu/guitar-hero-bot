@@ -110,8 +110,6 @@ class ScreenCapture:
         node_id = self.__start_screencast()
         pipeline = (
             f"pipewiresrc path={node_id} do-timestamp=true always-copy=true ! "
-            "videorate ! "
-            "video/x-raw,framerate=30/1 ! "
             "videoconvert ! "
             "video/x-raw,format=BGRA ! "  # use 4-byte conversion and get BGR using OpenCV
             "appsink drop=true max-buffers=1")

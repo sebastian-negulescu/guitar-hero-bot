@@ -1,10 +1,16 @@
-import time
+import asyncio
 import uinput
 
 notes_to_keys = [uinput.KEY_A,
                  uinput.KEY_S, uinput.KEY_D,
                  uinput.KEY_F, uinput.KEY_G]
 strum_key = uinput.KEY_J
+
+
+async def tap_key(device, key, delay=0.025):
+    device.emit(key, 1)
+    await asyncio.sleep(delay)
+    device.emit(key, 0)
 
 
 class Guitar:
@@ -20,9 +26,7 @@ class Guitar:
         self.__device.destroy()
 
     def strum(self):
-        self.__device.emit(strum_key, 1)
-        time.sleep(0.005)
-        self.__device.emit(strum_key, 0)
+        asyncio.run(tap_key(self.__device, strum_key))
         for key in self.__held_notes:
             self.__device.emit(key, 0)
         self.__held_notes.clear()
