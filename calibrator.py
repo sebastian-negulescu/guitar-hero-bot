@@ -33,7 +33,7 @@ SENSORS_BOTTOM = scale((
     (1457, 1207),
     (1643, 1207)), SCALE_FROM, SCALE_TO)
 
-SENSOR_BB = scale([(1, 1)], SCALE_FROM, SCALE_TO)[0]
+SENSOR_BB = scale([(20, 20)], SCALE_FROM, SCALE_TO)[0]
 
 
 def show_frame(frame):
@@ -57,13 +57,13 @@ def main():
             for lane, sensor in enumerate(SENSORS):
                 average = np.zeros(3)
 
-                for x in range(SENSOR_BB[0]):
-                    for y in range(SENSOR_BB[1]):
+                for x in range(-(SENSOR_BB[0] // 2), (SENSOR_BB[0] + 1) // 2):
+                    for y in range(-(SENSOR_BB[1] // 2), (SENSOR_BB[1] + 1) // 2):
                         pixel_colour = frame_hsv[sensor[1] + y][sensor[0] + x]
                         average += pixel_colour
 
                 average /= SENSOR_BB[0] * SENSOR_BB[1]
-                print(lane, average)
+                print(lane, average, frame_hsv[sensor[1]][sensor[0]])
 
             show_frame(f)
     except KeyboardInterrupt:

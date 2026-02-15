@@ -36,7 +36,16 @@ SENSORS_BOTTOM = scale((
     (1457, 1207),
     (1643, 1207)), SCALE_FROM, SCALE_TO)
 
-SENSOR_BB = scale([(1, 1)], SCALE_FROM, SCALE_TO)[0]
+SENSOR_BB = scale([(10, 10)], SCALE_FROM, SCALE_TO)[0]
+
+
+def intensity_thresh(pixel):
+    return pixel[2] >= 150
+
+
+def saturation_thresh(pixel):
+    return pixel[1] >= 80 and pixel[2] >= 90
+
 
 THRESHOLD = 150
 
@@ -99,15 +108,7 @@ def main():
                         calibration_delay = end_time - start_time
 
                 average /= SENSOR_BB[0] * SENSOR_BB[1]
-                # Four parts to a note
-                passes_threshold = False
-                if average[2] > 40:
-                    # not crap
-                    if average[1] >= 20 and average[2] >= 195:
-                        passes_threshold = True
-                    if average[1] >= 100:
-                        passes_threshold = True
-                if passes_threshold:
+                if intensity_thresh(average) or saturation_thresh(average):
                     if not start_time:
                         start_time = time.monotonic_ns()
 
