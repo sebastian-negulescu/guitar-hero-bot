@@ -20,6 +20,13 @@ def scale(points, scale_from, scale_to):
 
 
 SENSORS = scale((
+    (1071, 824),
+    (1175, 824),
+    (1280, 824),
+    (1384, 824),
+    (1489, 824)), SCALE_FROM, SCALE_TO)
+
+SENSORS_BOTTOM = scale((
     (899, 1190),
     (1057, 1207),
     (1275, 1189),
@@ -47,7 +54,7 @@ def main():
         for f in frames:
             frame_hsv = cv.cvtColor(f, cv.COLOR_BGR2HSV)
             print()
-            for lane, sensor in enumerate(SENSORS[0:1]):
+            for lane, sensor in enumerate(SENSORS):
                 average = np.zeros(3)
 
                 for x in range(SENSOR_BB[0]):

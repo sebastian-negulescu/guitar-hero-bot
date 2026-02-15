@@ -1,3 +1,5 @@
+import time
+import sys
 import evdev
 
 import cv2 as cv
@@ -21,23 +23,37 @@ def scale(points, scale_from, scale_to):
 
 
 SENSORS = scale((
+    (1071, 824),
+    (1175, 824),
+    (1280, 824),
+    (1384, 824),
+    (1489, 824)), SCALE_FROM, SCALE_TO)
+
+SENSORS_BOTTOM = scale((
     (899, 1190),
-    (1087, 1207),
-    (1281, 1189),
+    (1057, 1207),
+    (1275, 1189),
     (1457, 1207),
     (1643, 1207)), SCALE_FROM, SCALE_TO)
 
 SENSOR_BB = scale([(1, 1)], SCALE_FROM, SCALE_TO)[0]
 
-THRESHOLDS = [100, 100, 100, 100, 100]
+THRESHOLD = 150
 
 # 0 is idle
 # 1 is trigger
 # 2 is continue
 STATE = [0, 0, 0, 0, 0]
+DEBOUNCE = [0, 0, 0, 0, 0]
+DEBOUNCE_DELAY = 0
 
 
 def main():
+    start_time = None
+    end_time = None
+    calibration_delay = None
+    messages = []
+
     device = evdev.InputDevice("/dev/input/event4")
     activated = False
 
@@ -62,6 +78,7 @@ def main():
                 continue
 
             request_to_strum = False
+            message = {"notes": []}
             for lane, sensor in enumerate(SENSORS):
                 average = np.zeros(3)
 
@@ -70,28 +87,51 @@ def main():
                         pixel_colour = frame_hsv[sensor[1] + y][sensor[0] + x]
                         average += pixel_colour
 
+                if not end_time:
+                    bottom_average = np.zeros(3)
+                    for x in range(SENSOR_BB[0]):
+                        for y in range(SENSOR_BB[1]):
+                            pixel_colour = frame_hsv[SENSORS_BOTTOM[lane][1] + y][SENSORS_BOTTOM[lane][0] + x]
+                            bottom_average += pixel_colour
+                    bottom_average /= SENSOR_BB[0] * SENSOR_BB[1]
+                    if bottom_average[2] >= THRESHOLD:
+                        end_time = time.monotonic_ns()
+                        calibration_delay = end_time - start_time
+
                 average /= SENSOR_BB[0] * SENSOR_BB[1]
-                # print(average)
-                press = False
-                release = False
-                if average[2] >= THRESHOLDS[lane]:
+                # Four parts to a note
+                passes_threshold = False
+                if average[2] > 40:
+                    # not crap
+                    if average[1] >= 20 and average[2] >= 195:
+                        passes_threshold = True
+                    if average[1] >= 100:
+                        passes_threshold = True
+                if passes_threshold:
+                    if not start_time:
+                        start_time = time.monotonic_ns()
+
                     # good to strum
-                    if STATE[lane] == 0:
+                    if STATE[lane] == 0 and time.monotonic_ns() - DEBOUNCE[lane] > DEBOUNCE_DELAY:
                         STATE[lane] = 1
                         request_to_strum = True
-                        press = True
-                elif STATE[lane] > 0:
+                        message["notes"].append(lane)
+                        DEBOUNCE[lane] = time.monotonic_ns()
+                else:
                     STATE[lane] = 0
-                    release = True
-
-                if press:
-                    g.press_note(lane)
-                elif release:
-                    pass
 
             if request_to_strum:
-                print("strum")
-                g.strum()
+                message["timestamp"] = time.monotonic_ns()
+                messages.append(message)
+                pass
+
+            if calibration_delay is not None:
+                while len(messages) > 0 and time.monotonic_ns() - messages[0]["timestamp"] > calibration_delay:
+                    notes = messages.pop(0)["notes"]
+                    for note in notes:
+                        g.press_note(note)
+                    g.strum()
+
     except KeyboardInterrupt:
         pass
     finally:

@@ -104,6 +104,7 @@ def on_request_response(sender, object_path, iface, signal, params):
 
         # Get fd for private PipeWire remote
         pw_fd = sc.OpenPipeWireRemote(state["session_handle"], {})
+        log(pw_fd)
         state["pw_fd"] = int(pw_fd)
         log("Got PipeWire remote fd:", state["pw_fd"])
 
